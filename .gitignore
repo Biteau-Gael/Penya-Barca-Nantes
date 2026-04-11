@@ -5,3 +5,13 @@
 # React Router
 /.react-router/
 /build/
+
+# Uploads
+/uploads/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db

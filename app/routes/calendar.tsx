@@ -1,0 +1,109 @@
+import { useLoaderData, Link } from "react-router";
+import { Card, CardContent } from "~/components/ui/card";
+import { calendarLoader } from "./calendar.server";
+
+export const loader = calendarLoader;
+
+export function meta() {
+  return [
+    { title: "Calendrier des matchs — Penya Blaugrana Nantes" },
+    {
+      name: "description",
+      content: "Consultez les prochains matchs du FC Barcelone suivis par la Penya Blaugrana Nantes.",
+    },
+  ];
+}
+
+interface MatchItem {
+  id: string;
+  opponent: string;
+  competition: string;
+  matchDate: string;
+  venue: string;
+  homeScore: number | null;
+  awayScore: number | null;
+}
+
+function MatchCard({ match, isPast }: { match: MatchItem; isPast: boolean }) {
+  const date = new Date(match.matchDate).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const homeTeam = match.venue === "home" ? "Barça" : match.opponent;
+  const awayTeam = match.venue === "home" ? match.opponent : "Barça";
+
+  return (
+    <Link to={`/matchs/${match.id}`}>
+      <Card className={`hover:border-primary/50 transition-colors ${isPast ? "opacity-60" : ""}`}>
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-foreground">
+                {homeTeam} vs {awayTeam}
+                {match.homeScore !== null && (
+                  <span className="ml-2 text-primary font-bold">
+                    ({match.homeScore} - {match.awayScore})
+                  </span>
+                )}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {match.competition} — {match.venue === "home" ? "Domicile" : "Extérieur"}
+              </p>
+            </div>
+            <div className="text-right shrink-0 ml-4">
+              <p className="text-sm font-medium text-secondary">{date}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+export default function Calendar() {
+  const { upcoming, past } = useLoaderData<{ upcoming: MatchItem[]; past: MatchItem[] }>();
+
+  return (
+    <main className="min-h-[calc(100vh-3.5rem)] bg-background px-4 py-8">
+      <div className="mx-auto max-w-2xl space-y-8">
+        <h1 className="text-2xl font-bold text-foreground">Calendrier des matchs</h1>
+
+        {/* À venir */}
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-4">
+            À venir ({upcoming.length})
+          </h2>
+          {upcoming.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">
+              Aucun match programmé pour le moment.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {upcoming.map((match) => (
+                <MatchCard key={match.id} match={match} isPast={false} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Passés */}
+        {past.length > 0 && (
+          <section>
+            <h2 className="text-lg font-semibold text-muted-foreground mb-4">
+              Matchs passés ({past.length})
+            </h2>
+            <div className="space-y-3">
+              {past.map((match) => (
+                <MatchCard key={match.id} match={match} isPast={true} />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </main>
+  );
+}

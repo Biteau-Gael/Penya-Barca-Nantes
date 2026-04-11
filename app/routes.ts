@@ -1,3 +1,24 @@
-import { type RouteConfig, index } from "@react-router/dev/routes";
+import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
-export default [index("routes/home.tsx")] satisfies RouteConfig;
+export default [
+  index("routes/home.tsx"),
+  route("api/health", "routes/api.health.ts"),
+  route("api/auth/*", "routes/api.auth.$.ts"),
+  route("inscription", "routes/register.tsx"),
+  route("connexion", "routes/login.tsx"),
+  route("espace-membre", "routes/protected.tsx"),
+  route("profil", "routes/profile.tsx"),
+  route("uploads/*", "routes/uploads-files.ts"),
+  route("membres", "routes/members-list.tsx"),
+  route("membres/:memberId", "routes/member-profile.tsx"),
+  route("api/welcome-dismiss", "routes/api.welcome-dismiss.ts"),
+  route("admin/matchs", "routes/admin.matches.tsx"),
+  route("calendrier", "routes/calendar.tsx"),
+  route("matchs/:matchId", "routes/match-detail.tsx"),
+  route("classement", "routes/rankings.tsx"),
+  route("fil", "routes/feed.tsx"),
+  route("admin/dashboard", "routes/admin.dashboard.tsx"),
+  route("admin/membres", "routes/admin.members.tsx"),
+  route("admin/evenements", "routes/admin.events.tsx"),
+  route("evenements", "routes/events.tsx"),
+] satisfies RouteConfig;

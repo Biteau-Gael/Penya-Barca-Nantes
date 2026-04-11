@@ -5,10 +5,17 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLoaderData,
 } from "react-router";
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { Header } from "~/components/layout/header";
+import { WelcomeNotification } from "./components/shared/welcome-notification";
+import { getSession } from "~/lib/server/auth-utils.server";
+import { db } from "~/db/client";
+import { user } from "~/db/schema";
+import { eq } from "drizzle-orm";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -25,7 +32,7 @@ export const links: Route.LinksFunction = () => [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="fr">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -41,8 +48,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+export async function loader({ request }: Route.LoaderArgs) {
+  const session = await getSession(request);
+  if (!session?.user) {
+    return { user: null };
+  }
+
+  // Lire les données à jour depuis la DB (pas depuis le cache session)
+  const [userData] = await db
+    .select({ pseudo: user.pseudo, name: user.name, welcomeShown: user.welcomeShown, role: user.role })
+    .from(user)
+    .where(eq(user.id, session.user.id));
+
+  return {
+    user: userData
+      ? { name: userData.name, pseudo: userData.pseudo, welcomeShown: userData.welcomeShown, role: userData.role }
+      : { name: session.user.name, pseudo: null, welcomeShown: true, role: "member" },
+  };
+}
+
 export default function App() {
-  return <Outlet />;
+  const { user } = useLoaderData<typeof loader>();
+  return (
+    <>
+      <Header user={user} />
+      {user && !user.welcomeShown && <WelcomeNotification />}
+      <Outlet />
+    </>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

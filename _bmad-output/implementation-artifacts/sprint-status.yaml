@@ -43,51 +43,51 @@ story_location: "{project-root}/_bmad-output/implementation-artifacts"
 development_status:
   # Epic 1 : Accueil & Inscription des Membres
   epic-1: in-progress
-  1-1-initialisation-du-projet-et-infrastructure-docker: in-progress
-  1-2-inscription-dun-nouveau-membre: backlog
-  1-3-connexion-et-deconnexion: backlog
-  1-4-page-daccueil-publique: backlog
+  1-1-initialisation-du-projet-et-infrastructure-docker: review
+  1-2-inscription-dun-nouveau-membre: review
+  1-3-connexion-et-deconnexion: review
+  1-4-page-daccueil-publique: review
   epic-1-retrospective: optional
 
   # Epic 2 : Profils & Identite des Membres
-  epic-2: backlog
-  2-1-consulter-et-modifier-son-profil: backlog
-  2-2-consulter-le-profil-dun-autre-membre: backlog
-  2-3-historique-de-pronostics-et-statistiques-personnelles: backlog
-  2-4-notification-de-bienvenue: backlog
+  epic-2: in-progress
+  2-1-consulter-et-modifier-son-profil: review
+  2-2-consulter-le-profil-dun-autre-membre: review
+  2-3-historique-de-pronostics-et-statistiques-personnelles: review
+  2-4-notification-de-bienvenue: review
   epic-2-retrospective: optional
 
   # Epic 3 : Calendrier des Matchs
-  epic-3: backlog
-  3-1-administration-des-matchs-crud: backlog
-  3-2-calendrier-des-matchs-membres: backlog
-  3-3-calendrier-public-sans-authentification: backlog
+  epic-3: in-progress
+  3-1-administration-des-matchs-crud: review
+  3-2-calendrier-des-matchs-membres: review
+  3-3-calendrier-public-sans-authentification: review
   epic-3-retrospective: optional
 
   # Epic 4 : Pronostics & Classements
-  epic-4: backlog
-  4-1-configuration-admin-des-pronostics: backlog
-  4-2-soumettre-et-modifier-un-pronostic: backlog
-  4-3-consulter-les-pronostics-des-autres-membres: backlog
-  4-4-calcul-automatique-des-points-et-saisie-du-resultat: backlog
-  4-5-classement-general-et-resultats-detailles: backlog
+  epic-4: in-progress
+  4-1-configuration-admin-des-pronostics: review
+  4-2-soumettre-et-modifier-un-pronostic: review
+  4-3-consulter-les-pronostics-des-autres-membres: review
+  4-4-calcul-automatique-des-points-et-saisie-du-resultat: review
+  4-5-classement-general-et-resultats-detailles: review
   epic-4-retrospective: optional
 
   # Epic 5 : Fil Communautaire
-  epic-5: backlog
-  5-1-publier-un-post-sur-le-fil-communautaire: backlog
-  5-2-consulter-le-fil-communautaire-avec-temps-reel: backlog
-  5-3-reagir-a-un-post: backlog
-  5-4-commenter-un-post: backlog
-  5-5-moderation-et-annonces-officielles: backlog
+  epic-5: in-progress
+  5-1-publier-un-post-sur-le-fil-communautaire: review
+  5-2-consulter-le-fil-communautaire-avec-temps-reel: review
+  5-3-reagir-a-un-post: review
+  5-4-commenter-un-post: review
+  5-5-moderation-et-annonces-officielles: review
   epic-5-retrospective: optional
 
   # Epic 6 : Administration & Back-Office
-  epic-6: backlog
-  6-1-tableau-de-bord-admin: backlog
-  6-2-gestion-des-membres: backlog
-  6-3-gestion-des-evenements-hors-match: backlog
-  6-4-gestion-des-roles-et-parametres-de-lapplication: backlog
+  epic-6: in-progress
+  6-1-tableau-de-bord-admin: review
+  6-2-gestion-des-membres: review
+  6-3-gestion-des-evenements-hors-match: review
+  6-4-gestion-des-roles-et-parametres-de-lapplication: review
   epic-6-retrospective: optional
 
   # Epic 7 : Acces Partenaire Bar (Phase 2)
