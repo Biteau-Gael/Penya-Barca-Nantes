@@ -3,9 +3,13 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "~/db/client";
 import { redis } from "./redis.server";
 import { logger } from "./logger.server";
+import { getEnv } from "~/config/env.server";
+
+const env = getEnv();
 
 export const auth = betterAuth({
   basePath: "/api/auth",
+  trustedOrigins: env.APP_URL ? [env.APP_URL] : [],
   database: drizzleAdapter(db, {
     provider: "pg",
   }),
