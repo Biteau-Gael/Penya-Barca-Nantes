@@ -11,6 +11,12 @@ export const matches = pgTable("matches", {
   awayScore: integer("away_score"),
   predictionDeadline: timestamp("prediction_deadline"),
   pointsScheme: varchar("points_scheme", { length: 20 }).default("standard"),
+  // API-Football
+  externalFixtureId: integer("external_fixture_id").unique(),
+  opponentLogo: text("opponent_logo"),
+  competitionLogo: text("competition_logo"),
+  /** JSON enrichi : lineups, événements, statistiques (cache API) */
+  matchDetails: text("match_details"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

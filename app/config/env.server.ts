@@ -11,6 +11,7 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(["error", "warn", "info", "debug"])
     .default("info"),
+  API_FOOTBALL_KEY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

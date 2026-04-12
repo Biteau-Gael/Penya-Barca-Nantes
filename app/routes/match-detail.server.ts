@@ -5,6 +5,7 @@ import { getSession } from "~/lib/server/auth-utils.server";
 import { predictionSchema } from "~/lib/validation/prediction";
 import { logger } from "~/lib/server/logger.server";
 import { createId } from "~/lib/utils";
+import { fetchMatchDetails, type MatchDetails } from "~/lib/server/api-football.server";
 
 export async function matchDetailLoader({
   request,
@@ -71,6 +72,30 @@ export async function matchDetailLoader({
     }));
   }
 
+  // --- Détails enrichis (lineups, stats) : fetch + cache ---
+  let matchDetails: MatchDetails | null = null;
+  const isFinished = match.homeScore !== null;
+
+  if (match.externalFixtureId && isFinished) {
+    if (match.matchDetails) {
+      // Cache hit
+      matchDetails = JSON.parse(match.matchDetails) as MatchDetails;
+    } else {
+      // Fetch depuis l'API et cache en DB
+      try {
+        matchDetails = await fetchMatchDetails(match.externalFixtureId);
+        await db
+          .update(matches)
+          .set({ matchDetails: JSON.stringify(matchDetails), updatedAt: new Date() })
+          .where(eq(matches.id, match.id));
+        logger.info({ matchId: match.id }, "Détails match mis en cache");
+      } catch (error) {
+        logger.error({ error, matchId: match.id }, "Erreur fetch détails match");
+        // On continue sans les détails
+      }
+    }
+  }
+
   return {
     match: {
       ...match,
@@ -78,7 +103,9 @@ export async function matchDetailLoader({
       predictionDeadline: match.predictionDeadline?.toISOString() ?? null,
       createdAt: match.createdAt.toISOString(),
       updatedAt: match.updatedAt.toISOString(),
+      matchDetails: undefined, // Ne pas envoyer le JSON brut
     },
+    matchDetails,
     userPrediction,
     otherPredictions,
     isLoggedIn: !!session?.user,

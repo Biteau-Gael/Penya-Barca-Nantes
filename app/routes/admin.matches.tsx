@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData, useActionData, Form, useNavigation } from "react-router";
+import { useLoaderData, useActionData, Form, useNavigation, useFetcher } from "react-router";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -26,11 +26,35 @@ interface MatchData {
   awayScore: number | null;
   predictionDeadline: string | null;
   pointsScheme: string | null;
+  opponentLogo: string | null;
+  competitionLogo: string | null;
+  externalFixtureId: number | null;
 }
 
 interface ActionSuccess { success: true; message: string }
 interface ActionError { error: string }
 type ActionData = ActionSuccess | ActionError;
+
+function SyncButton() {
+  const fetcher = useFetcher<{ success?: boolean; message?: string; error?: string }>();
+  const isSyncing = fetcher.state !== "idle";
+
+  return (
+    <div className="flex items-center gap-2">
+      {fetcher.data && "success" in fetcher.data && (
+        <span className="text-xs text-success">{fetcher.data.message}</span>
+      )}
+      {fetcher.data && "error" in fetcher.data && (
+        <span className="text-xs text-destructive">{fetcher.data.error}</span>
+      )}
+      <fetcher.Form method="post" action="/api/sync-matches">
+        <Button type="submit" variant="outline" size="sm" disabled={isSyncing}>
+          {isSyncing ? "Synchronisation..." : "Sync API-Football"}
+        </Button>
+      </fetcher.Form>
+    </div>
+  );
+}
 
 export default function AdminMatches() {
   const { matches } = useLoaderData<{ matches: MatchData[] }>();
@@ -47,7 +71,10 @@ export default function AdminMatches() {
   return (
     <main className="min-h-[calc(100vh-3.5rem)] bg-background px-4 py-8">
       <div className="mx-auto max-w-3xl space-y-6">
-        <h1 className="text-2xl font-bold text-foreground">Gestion des matchs</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-foreground">Gestion des matchs</h1>
+          <SyncButton />
+        </div>
 
         {actionData && "success" in actionData && (
           <div className="rounded-md bg-success/10 p-3 text-sm text-success">
@@ -211,20 +238,32 @@ export default function AdminMatches() {
                         isPast ? "opacity-60" : ""
                       }`}
                     >
-                      <div>
-                        <p className="font-medium text-foreground">
-                          {match.venue === "home" ? "Barça" : match.opponent}
-                          {" vs "}
-                          {match.venue === "home" ? match.opponent : "Barça"}
-                          {match.homeScore !== null && (
-                            <span className="ml-2 text-primary font-bold">
-                              ({match.homeScore} - {match.awayScore})
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {match.competition} — {date} — {match.venue === "home" ? "Domicile" : "Extérieur"}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        {match.opponentLogo && (
+                          <img
+                            src={match.opponentLogo}
+                            alt={match.opponent}
+                            className="h-8 w-8 object-contain shrink-0"
+                          />
+                        )}
+                        <div>
+                          <p className="font-medium text-foreground">
+                            {match.venue === "home" ? "Barça" : match.opponent}
+                            {" vs "}
+                            {match.venue === "home" ? match.opponent : "Barça"}
+                            {match.homeScore !== null && (
+                              <span className="ml-2 text-primary font-bold">
+                                ({match.homeScore} - {match.awayScore})
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {match.competition} — {date} — {match.venue === "home" ? "Domicile" : "Extérieur"}
+                            {match.externalFixtureId && (
+                              <span className="ml-1 text-accent">(API)</span>
+                            )}
+                          </p>
+                        </div>
                       </div>
                       <div className="flex gap-2 shrink-0 flex-wrap justify-end">
                         {isPast && match.homeScore === null && (

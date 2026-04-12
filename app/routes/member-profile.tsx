@@ -20,8 +20,22 @@ interface StatsData {
   successRate: number;
 }
 
+interface PredictionHistory {
+  matchId: string;
+  opponent: string;
+  competition: string;
+  matchDate: string;
+  venue: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  predHomeScore: number;
+  predAwayScore: number;
+  points: number | null;
+  opponentLogo: string | null;
+}
+
 export default function MemberProfile() {
-  const { member, stats } = useLoaderData<{ member: MemberData; stats: StatsData }>();
+  const { member, stats, predictions } = useLoaderData<{ member: MemberData; stats: StatsData; predictions: PredictionHistory[] }>();
 
   const displayName = member.pseudo || member.name;
   const createdAt = new Date(member.createdAt).toLocaleDateString("fr-FR", {
@@ -88,6 +102,60 @@ export default function MemberProfile() {
             )}
           </CardContent>
         </Card>
+
+        {/* Historique des pronostics */}
+        {predictions.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Historique des pronostics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {predictions.map((p) => {
+                  const date = new Date(p.matchDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+                  return (
+                    <Link
+                      key={p.matchId}
+                      to={`/matchs/${p.matchId}`}
+                      className="flex items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {p.opponentLogo && (
+                          <img src={p.opponentLogo} alt={p.opponent} className="h-6 w-6 object-contain shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {p.venue === "home" ? "Barça" : p.opponent} - {p.venue === "home" ? p.opponent : "Barça"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{date} · {p.competition}</p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold text-secondary">
+                          {p.predHomeScore} - {p.predAwayScore}
+                        </p>
+                        {p.homeScore !== null && (
+                          <p className="text-xs text-muted-foreground">
+                            Réel : {p.homeScore} - {p.awayScore}
+                          </p>
+                        )}
+                      </div>
+                      {p.points !== null && (
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded shrink-0 ${
+                          p.points >= 3 ? "bg-green-500/20 text-green-400" :
+                          p.points > 0 ? "bg-yellow-500/20 text-yellow-400" :
+                          "bg-red-500/20 text-red-400"
+                        }`}>
+                          +{p.points}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </main>
   );

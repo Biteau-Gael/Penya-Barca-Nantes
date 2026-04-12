@@ -57,6 +57,12 @@ export function Header({ user }: HeaderProps) {
               >
                 Classement
               </Link>
+              <Link
+                to="/liga"
+                className="text-sm text-foreground hover:text-primary hidden sm:inline"
+              >
+                Liga
+              </Link>
               {user.role === "admin" && (
                 <Link
                   to="/admin/dashboard"

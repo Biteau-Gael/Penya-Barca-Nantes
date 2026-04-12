@@ -2,8 +2,8 @@ import { redirect } from "react-router";
 import { requireAuth } from "~/lib/server/auth-utils.server";
 import { updateProfileSchema } from "~/lib/validation/user";
 import { db } from "~/db/client";
-import { user } from "~/db/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { user, matchPredictions, matches } from "~/db/schema";
+import { eq, and, ne, sql, isNotNull, desc } from "drizzle-orm";
 import { processAvatar } from "~/lib/server/upload";
 import { logger } from "~/lib/server/logger.server";
 
@@ -22,12 +22,44 @@ export async function profileLoader({ request }: { request: Request }) {
 
   if (!userData) throw redirect("/connexion");
 
-  // Stats pronostics — valeurs par défaut (Epic 4 alimentera les données réelles)
+  // Stats pronostics réelles
+  const [statsRow] = await db
+    .select({
+      totalPredictions: sql<number>`count(*)::int`,
+      totalPoints: sql<number>`coalesce(sum(${matchPredictions.points}), 0)::int`,
+      scoredCount: sql<number>`count(${matchPredictions.points})::int`,
+      correctCount: sql<number>`count(case when ${matchPredictions.points} > 0 then 1 end)::int`,
+    })
+    .from(matchPredictions)
+    .where(eq(matchPredictions.userId, session.user.id));
+
   const stats = {
-    totalPredictions: 0,
-    totalPoints: 0,
-    successRate: 0,
+    totalPredictions: statsRow?.totalPredictions ?? 0,
+    totalPoints: statsRow?.totalPoints ?? 0,
+    successRate: statsRow && statsRow.scoredCount > 0
+      ? Math.round((statsRow.correctCount / statsRow.scoredCount) * 100)
+      : 0,
   };
+
+  // Historique des pronostics
+  const predictions = await db
+    .select({
+      predHomeScore: matchPredictions.homeScore,
+      predAwayScore: matchPredictions.awayScore,
+      points: matchPredictions.points,
+      matchId: matches.id,
+      opponent: matches.opponent,
+      competition: matches.competition,
+      matchDate: matches.matchDate,
+      venue: matches.venue,
+      homeScore: matches.homeScore,
+      awayScore: matches.awayScore,
+      opponentLogo: matches.opponentLogo,
+    })
+    .from(matchPredictions)
+    .innerJoin(matches, eq(matchPredictions.matchId, matches.id))
+    .where(eq(matchPredictions.userId, session.user.id))
+    .orderBy(desc(matches.matchDate));
 
   return {
     user: {
@@ -41,6 +73,19 @@ export async function profileLoader({ request }: { request: Request }) {
       createdAt: userData.createdAt.toISOString(),
     },
     stats,
+    predictions: predictions.map((p) => ({
+      matchId: p.matchId,
+      opponent: p.opponent,
+      competition: p.competition,
+      matchDate: p.matchDate.toISOString(),
+      venue: p.venue,
+      homeScore: p.homeScore,
+      awayScore: p.awayScore,
+      predHomeScore: p.predHomeScore,
+      predAwayScore: p.predAwayScore,
+      points: p.points,
+      opponentLogo: p.opponentLogo,
+    })),
   };
 }
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData, useActionData, Form, useNavigation } from "react-router";
+import { useLoaderData, useActionData, Form, useNavigation, Link } from "react-router";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -40,8 +40,22 @@ interface StatsData {
   successRate: number;
 }
 
+interface PredictionHistory {
+  matchId: string;
+  opponent: string;
+  competition: string;
+  matchDate: string;
+  venue: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  predHomeScore: number;
+  predAwayScore: number;
+  points: number | null;
+  opponentLogo: string | null;
+}
+
 export default function Profile() {
-  const { user: userData, stats } = useLoaderData<{ user: UserData; stats: StatsData }>();
+  const { user: userData, stats, predictions } = useLoaderData<{ user: UserData; stats: StatsData; predictions: PredictionHistory[] }>();
   const actionData = useActionData<ActionData>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -204,14 +218,56 @@ export default function Profile() {
             <CardTitle className="text-lg">Historique des pronostics</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-6">
-              <p className="text-muted-foreground">
+            {predictions.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">
                 Tes pronostics apparaîtront ici dès le premier match !
               </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Le calendrier des matchs arrive bientôt 🎉
-              </p>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                {predictions.map((p) => {
+                  const date = new Date(p.matchDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+                  const BARCA_LOGO = "https://images.fotmob.com/image_resources/logo/teamlogo/8634.png";
+                  return (
+                    <Link
+                      key={p.matchId}
+                      to={`/matchs/${p.matchId}`}
+                      className="flex items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {p.opponentLogo && (
+                          <img src={p.opponentLogo} alt={p.opponent} className="h-6 w-6 object-contain shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {p.venue === "home" ? "Barça" : p.opponent} - {p.venue === "home" ? p.opponent : "Barça"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{date} · {p.competition}</p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold text-secondary">
+                          {p.predHomeScore} - {p.predAwayScore}
+                        </p>
+                        {p.homeScore !== null && (
+                          <p className="text-xs text-muted-foreground">
+                            Réel : {p.homeScore} - {p.awayScore}
+                          </p>
+                        )}
+                      </div>
+                      {p.points !== null && (
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded shrink-0 ${
+                          p.points >= 3 ? "bg-green-500/20 text-green-400" :
+                          p.points > 0 ? "bg-yellow-500/20 text-yellow-400" :
+                          "bg-red-500/20 text-red-400"
+                        }`}>
+                          +{p.points}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
