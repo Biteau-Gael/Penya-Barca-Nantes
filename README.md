@@ -81,13 +81,13 @@ PORT=3000
 LOG_LEVEL=debug
 
 # Base de donnees
-DATABASE_URL=postgresql://penya:penya_secret@localhost:5432/penya_barca_nantes
+DATABASE_URL=postgresql://penya:YOUR_PASSWORD_HERE@localhost:5432/penya_barca_nantes
 
 # Redis
 REDIS_URL=redis://localhost:6379
 
 # Auth - generer un secret fort en production
-AUTH_SECRET=change-me-in-production-min-16-chars
+AUTH_SECRET=YOUR_AUTH_SECRET_HERE_MIN_16_CHARS
 
 # API Football (RapidAPI) - optionnel, pour la sync des matchs
 API_FOOTBALL_KEY=votre-cle-rapidapi

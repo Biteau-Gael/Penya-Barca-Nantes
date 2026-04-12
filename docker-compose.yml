@@ -8,12 +8,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - DATABASE_URL=postgresql://penya:penya_secret@postgres:5432/penya_barca_nantes
-      - REDIS_URL=redis://redis:6379
-      - AUTH_SECRET=${AUTH_SECRET:-change-me-in-production}
+    env_file: .env
     restart: unless-stopped
 
   postgres:
@@ -24,7 +19,7 @@ services:
     environment:
       - POSTGRES_DB=penya_barca_nantes
       - POSTGRES_USER=penya
-      - POSTGRES_PASSWORD=penya_secret
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
     ports:
       - "5432:5432"
     healthcheck:

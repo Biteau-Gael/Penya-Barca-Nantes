@@ -13,5 +13,11 @@
 .vscode/
 .idea/
 
+# Claude Code
+.claude/
+
+# Screenshots
+*.png
+
 # OS
 Thumbs.db

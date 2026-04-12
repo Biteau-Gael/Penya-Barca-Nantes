@@ -9,10 +9,4 @@ services:
       - /app/node_modules
     ports:
       - "3000:5173"
-    environment:
-      - NODE_ENV=development
-      - PORT=5173
-      - DATABASE_URL=postgresql://penya:penya_secret@postgres:5432/penya_barca_nantes
-      - REDIS_URL=redis://redis:6379
-      - AUTH_SECRET=dev-secret-change-me-in-production
-      - LOG_LEVEL=debug
+    env_file: .env
