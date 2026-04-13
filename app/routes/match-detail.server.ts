@@ -6,6 +6,7 @@ import { predictionSchema } from "~/lib/validation/prediction";
 import { logger } from "~/lib/server/logger.server";
 import { createId } from "~/lib/utils";
 import { fetchMatchDetails, type MatchDetails } from "~/lib/server/api-football.server";
+import { evaluateBadges } from "~/lib/server/badges.server";
 
 export async function matchDetailLoader({
   request,
@@ -184,5 +185,6 @@ export async function matchDetailAction({
   });
 
   logger.info({ action: "prediction-submitted", userId: session.user.id, matchId: params.matchId }, "Pronostic soumis");
+  evaluateBadges(session.user.id).catch(() => {});
   return { success: true, message: "Pronostic enregistré avec succès !" };
 }

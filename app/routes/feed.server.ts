@@ -6,6 +6,7 @@ import { eq, desc, and, sql } from "drizzle-orm";
 import { createPostSchema, createCommentSchema } from "~/lib/validation/feed";
 import { logger } from "~/lib/server/logger.server";
 import { createId } from "~/lib/utils";
+import { evaluateBadges } from "~/lib/server/badges.server";
 
 export async function feedLoader({ request }: { request: Request }) {
   let session;
@@ -132,6 +133,7 @@ export async function feedAction({ request }: { request: Request }) {
     });
 
     logger.info({ action: "post-created", userId: session.user.id }, "Post publié");
+    evaluateBadges(session.user.id).catch(() => {});
     return { success: true };
   }
 
@@ -151,6 +153,7 @@ export async function feedAction({ request }: { request: Request }) {
         postId,
         userId: session.user.id,
       });
+      evaluateBadges(session.user.id).catch(() => {});
     }
 
     return { success: true };
@@ -172,6 +175,7 @@ export async function feedAction({ request }: { request: Request }) {
       content: result.data.content,
     });
 
+    evaluateBadges(session.user.id).catch(() => {});
     return { success: true };
   }
 
