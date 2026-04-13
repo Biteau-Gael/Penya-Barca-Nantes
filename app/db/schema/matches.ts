@@ -17,6 +17,8 @@ export const matches = pgTable("matches", {
   competitionLogo: text("competition_logo"),
   /** JSON enrichi : lineups, événements, statistiques (cache API) */
   matchDetails: text("match_details"),
+  /** Saison (ex: "2025-2026") */
+  season: varchar("season", { length: 20 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -2,10 +2,11 @@ import { redirect } from "react-router";
 import { requireAuth } from "~/lib/server/auth-utils.server";
 import { updateProfileSchema } from "~/lib/validation/user";
 import { db } from "~/db/client";
-import { user, matchPredictions, matches } from "~/db/schema";
+import { user, matchPredictions, matches, microPredictionAnswers } from "~/db/schema";
 import { eq, and, ne, sql, isNotNull, desc } from "drizzle-orm";
 import { processAvatar } from "~/lib/server/upload";
 import { logger } from "~/lib/server/logger.server";
+import { getUserBadges, BADGE_ICONS } from "~/lib/server/badges.server";
 
 export async function profileLoader({ request }: { request: Request }) {
   let session;
@@ -61,6 +62,18 @@ export async function profileLoader({ request }: { request: Request }) {
     .where(eq(matchPredictions.userId, session.user.id))
     .orderBy(desc(matches.matchDate));
 
+  // Points micro-pronos
+  const [microStats] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${microPredictionAnswers.points}), 0)::int`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(microPredictionAnswers)
+    .where(eq(microPredictionAnswers.userId, session.user.id));
+
+  // Badges
+  const userBadges = await getUserBadges(session.user.id);
+
   return {
     user: {
       id: userData.id,
@@ -71,8 +84,18 @@ export async function profileLoader({ request }: { request: Request }) {
       role: userData.role,
       gdprConsent: userData.gdprConsent,
       createdAt: userData.createdAt.toISOString(),
+      currentStreak: userData.currentStreak,
+      bestStreak: userData.bestStreak,
     },
     stats,
+    microPronoStats: {
+      totalPoints: microStats?.total ?? 0,
+      totalAnswers: microStats?.count ?? 0,
+    },
+    badges: userBadges.map((b) => ({
+      name: b.name,
+      emoji: BADGE_ICONS[b.icon] || b.icon,
+    })),
     predictions: predictions.map((p) => ({
       matchId: p.matchId,
       opponent: p.opponent,

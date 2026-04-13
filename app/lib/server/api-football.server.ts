@@ -6,6 +6,9 @@ import { logger } from "./logger.server";
 import { createId } from "~/lib/utils";
 import { calculatePoints } from "~/lib/points";
 import { invalidateStandingsCache } from "~/routes/liga-standings.server";
+import { getActiveSeasonLabel } from "~/lib/server/seasons.server";
+import { evaluateBadges } from "~/lib/server/badges.server";
+import { updateStreak } from "~/lib/server/streaks.server";
 
 const API_BASE = "https://free-api-live-football-data.p.rapidapi.com";
 const API_HOST = "free-api-live-football-data.p.rapidapi.com";
@@ -153,6 +156,8 @@ export async function syncMatches(): Promise<{ created: number; updated: number;
   let updated = 0;
   let total = 0;
 
+  const seasonLabel = await getActiveSeasonLabel();
+
   for (const [leagueId, competitionName] of Object.entries(LEAGUES)) {
     const lid = Number(leagueId);
     let leagueMatches: ApiMatch[];
@@ -225,9 +230,18 @@ export async function syncMatches(): Promise<{ created: number; updated: number;
               .update(matchPredictions)
               .set({ points, updatedAt: new Date() })
               .where(eq(matchPredictions.id, pred.id));
+
+            // Mettre à jour le streak
+            await updateStreak(pred.userId, points >= 3, existing.id);
           }
 
           if (predictions.length > 0) {
+            // Évaluer les badges pour chaque joueur
+            const userIds = new Set(predictions.map((p) => p.userId));
+            for (const uid of userIds) {
+              await evaluateBadges(uid);
+            }
+
             logger.info(
               { matchId: existing.id, predictions: predictions.length },
               `Points calculés automatiquement pour ${predictions.length} pronostics`,
@@ -262,6 +276,7 @@ export async function syncMatches(): Promise<{ created: number; updated: number;
           competitionLogo,
           externalFixtureId: externalId,
           pointsScheme: "standard",
+          season: seasonLabel,
         });
 
         created++;

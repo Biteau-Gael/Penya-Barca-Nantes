@@ -4,6 +4,7 @@ import {
   timestamp,
   boolean,
   varchar,
+  integer,
 } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
@@ -20,6 +21,9 @@ export const user = pgTable("user", {
   avatarUrl: text("avatar_url"),
   gdprConsent: boolean("gdpr_consent").notNull().default(false),
   welcomeShown: boolean("welcome_shown").notNull().default(false),
+  // Séries de pronostics
+  currentStreak: integer("current_streak").notNull().default(0),
+  bestStreak: integer("best_streak").notNull().default(0),
 });
 
 export const session = pgTable("session", {

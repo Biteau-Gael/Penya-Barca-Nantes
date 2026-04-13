@@ -50,6 +50,13 @@
       "when": 1776022558864,
       "tag": "0006_lively_sway",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776037985523,
+      "tag": "0007_slimy_maria_hill",
+      "breakpoints": true
     }
   ]
 }

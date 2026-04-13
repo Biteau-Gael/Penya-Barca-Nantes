@@ -33,6 +33,7 @@ const NAV_LINKS = [
   { to: "/liga", label: "Liga" },
   { to: "/membres", label: "Membres" },
   { to: "/evenements", label: "Événements" },
+  { to: "/badges", label: "Badges" },
 ];
 
 export function Header({ user }: HeaderProps) {

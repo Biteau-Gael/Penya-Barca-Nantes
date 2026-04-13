@@ -55,7 +55,13 @@ interface PredictionHistory {
 }
 
 export default function Profile() {
-  const { user: userData, stats, predictions } = useLoaderData<{ user: UserData; stats: StatsData; predictions: PredictionHistory[] }>();
+  const { user: userData, stats, predictions, badges, microPronoStats } = useLoaderData<{
+    user: UserData & { currentStreak: number; bestStreak: number };
+    stats: StatsData;
+    predictions: PredictionHistory[];
+    badges: { name: string; emoji: string }[];
+    microPronoStats: { totalPoints: number; totalAnswers: number };
+  }>();
   const actionData = useActionData<ActionData>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -189,6 +195,33 @@ export default function Profile() {
           </CardContent>
         </Card>
 
+        {/* Badges */}
+        {badges.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">
+                <Link to="/badges" className="hover:text-primary transition-colors">
+                  Mes badges ({badges.length})
+                </Link>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {badges.map((b) => (
+                  <span
+                    key={b.name}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-accent/10 text-xs font-medium"
+                    title={b.name}
+                  >
+                    <span>{b.emoji}</span>
+                    <span className="text-foreground">{b.name}</span>
+                  </span>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Statistiques */}
         <Card>
           <CardHeader>
@@ -209,6 +242,32 @@ export default function Profile() {
                 <p className="text-xs text-muted-foreground">Réussite</p>
               </div>
             </div>
+            {microPronoStats.totalAnswers > 0 && (
+              <div className="flex justify-center gap-6 mt-4 pt-4 border-t border-border">
+                <div className="text-center">
+                  <p className="text-lg font-bold text-accent">{microPronoStats.totalPoints}</p>
+                  <p className="text-xs text-muted-foreground">Pts micro-pronos</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-foreground">{microPronoStats.totalAnswers}</p>
+                  <p className="text-xs text-muted-foreground">Micro-pronos joués</p>
+                </div>
+              </div>
+            )}
+            {(userData.currentStreak > 0 || userData.bestStreak > 0) && (
+              <div className="flex justify-center gap-6 mt-4 pt-4 border-t border-border">
+                {userData.currentStreak > 0 && (
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-orange-400">{userData.currentStreak}</p>
+                    <p className="text-xs text-muted-foreground">Série en cours</p>
+                  </div>
+                )}
+                <div className="text-center">
+                  <p className="text-lg font-bold text-foreground">{userData.bestStreak}</p>
+                  <p className="text-xs text-muted-foreground">Meilleure série</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

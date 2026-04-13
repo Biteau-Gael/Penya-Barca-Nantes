@@ -28,6 +28,12 @@ interface MatchItem {
 
 const BARCA_LOGO = "https://images.fotmob.com/image_resources/logo/teamlogo/8634.png";
 
+function isMatchToday(matchDate: string): boolean {
+  const today = new Date();
+  const match = new Date(matchDate);
+  return match.toDateString() === today.toDateString();
+}
+
 function MatchCard({ match, isPast }: { match: MatchItem; isPast: boolean }) {
   const date = new Date(match.matchDate).toLocaleDateString("fr-FR", {
     weekday: "long",
@@ -41,45 +47,60 @@ function MatchCard({ match, isPast }: { match: MatchItem; isPast: boolean }) {
   const awayTeam = match.venue === "home" ? match.opponent : "Barça";
   const homeLogo = match.venue === "home" ? BARCA_LOGO : match.opponentLogo;
   const awayLogo = match.venue === "home" ? match.opponentLogo : BARCA_LOGO;
+  const today = isMatchToday(match.matchDate);
 
   return (
-    <Link to={`/matchs/${match.id}`}>
-      <Card className={`hover:border-primary/50 transition-colors ${isPast ? "opacity-60" : ""}`}>
-        <CardContent className="py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {homeLogo && (
-                <img src={homeLogo} alt={homeTeam} className="h-8 w-8 object-contain shrink-0" />
-              )}
-              <div className="min-w-0">
-                <p className="font-semibold text-foreground">
-                  {homeTeam} vs {awayTeam}
-                  {match.homeScore !== null && (
-                    <span className="ml-2 text-primary font-bold">
-                      ({match.homeScore} - {match.awayScore})
-                    </span>
-                  )}
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                  {match.competitionLogo && (
-                    <img src={match.competitionLogo} alt={match.competition} className="h-4 w-4 object-contain" />
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    {match.competition} — {match.venue === "home" ? "Domicile" : "Extérieur"}
+    <div className="space-y-1">
+      <Link to={`/matchs/${match.id}`}>
+        <Card className={`hover:border-primary/50 transition-colors ${isPast ? "opacity-60" : ""} ${today ? "border-green-500/50" : ""}`}>
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {homeLogo && (
+                  <img src={homeLogo} alt={homeTeam} className="h-8 w-8 object-contain shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="font-semibold text-foreground">
+                    {homeTeam} vs {awayTeam}
+                    {match.homeScore !== null && (
+                      <span className="ml-2 text-primary font-bold">
+                        ({match.homeScore} - {match.awayScore})
+                      </span>
+                    )}
                   </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {match.competitionLogo && (
+                      <img src={match.competitionLogo} alt={match.competition} className="h-4 w-4 object-contain" />
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {match.competition} — {match.venue === "home" ? "Domicile" : "Extérieur"}
+                    </p>
+                  </div>
                 </div>
+                {awayLogo && (
+                  <img src={awayLogo} alt={awayTeam} className="h-8 w-8 object-contain shrink-0" />
+                )}
               </div>
-              {awayLogo && (
-                <img src={awayLogo} alt={awayTeam} className="h-8 w-8 object-contain shrink-0" />
-              )}
+              <div className="text-right shrink-0 ml-4">
+                <p className="text-sm font-medium text-secondary">{date}</p>
+              </div>
             </div>
-            <div className="text-right shrink-0 ml-4">
-              <p className="text-sm font-medium text-secondary">{date}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+          </CardContent>
+        </Card>
+      </Link>
+      {today && (
+        <Link
+          to={`/soiree/${match.id}`}
+          className="flex items-center justify-center gap-2 rounded-lg border border-green-500/30 bg-green-500/5 p-2 text-xs font-bold text-green-400 hover:bg-green-500/10 transition-colors"
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+          </span>
+          Soirée match en direct →
+        </Link>
+      )}
+    </div>
   );
 }
 
