@@ -40,8 +40,6 @@ export async function loader() {
   return new Response(
     JSON.stringify({
       status: allHealthy ? "ok" : "degraded",
-      services,
-      timestamp: new Date().toISOString(),
     }),
     {
       status: allHealthy ? 200 : 503,

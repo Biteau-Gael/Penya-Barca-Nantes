@@ -18,7 +18,6 @@ export async function action({ request }: { request: Request }) {
     });
   } catch (error) {
     logger.error({ error }, "Erreur sync API-Football");
-    const message = error instanceof Error ? error.message : "Erreur inconnue";
-    return Response.json({ error: message }, { status: 500 });
+    return Response.json({ error: "Erreur lors de la synchronisation" }, { status: 500 });
   }
 }

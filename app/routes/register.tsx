@@ -56,7 +56,7 @@ export default function Register() {
       password: raw.password,
       name: raw.pseudo,
       pseudo: raw.pseudo,
-      gdprConsent: true,
+      gdprConsent: result.data.gdprConsent,
     });
 
     if (error) {

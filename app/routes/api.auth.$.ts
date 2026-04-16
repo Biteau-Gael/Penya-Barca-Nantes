@@ -1,5 +1,6 @@
 import { auth } from "~/lib/server/auth.server";
 import { checkRateLimit } from "~/lib/server/rate-limit.server";
+import { signUpServerSchema } from "~/lib/validation/user";
 import { logger } from "~/lib/server/logger.server";
 
 function getClientIp(request: Request): string {
@@ -34,6 +35,26 @@ async function applyRateLimit(request: Request) {
   return null;
 }
 
+async function validateSignUp(request: Request): Promise<Response | null> {
+  const url = new URL(request.url);
+  if (!url.pathname.includes("sign-up")) return null;
+
+  try {
+    const cloned = request.clone();
+    const body = await cloned.json();
+    const result = signUpServerSchema.safeParse(body);
+    if (!result.success) {
+      return new Response(
+        JSON.stringify({ error: { message: "Données d'inscription invalides" } }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+  } catch {
+    // If body parsing fails, let better-auth handle it
+  }
+  return null;
+}
+
 export async function loader({ request }: { request: Request }) {
   return auth.handler(request);
 }
@@ -41,5 +62,9 @@ export async function loader({ request }: { request: Request }) {
 export async function action({ request }: { request: Request }) {
   const rateLimitResponse = await applyRateLimit(request);
   if (rateLimitResponse) return rateLimitResponse;
+
+  const validationResponse = await validateSignUp(request);
+  if (validationResponse) return validationResponse;
+
   return auth.handler(request);
 }

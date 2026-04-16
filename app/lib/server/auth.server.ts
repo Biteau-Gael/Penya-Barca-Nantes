@@ -25,6 +25,7 @@ export const auth = betterAuth({
       role: {
         type: "string",
         defaultValue: "member",
+        input: false,
       },
       avatarUrl: {
         type: "string",
