@@ -79,8 +79,11 @@ export async function matchDetailLoader({
 
   if (match.externalFixtureId && isFinished) {
     if (match.matchDetails) {
-      // Cache hit
-      matchDetails = JSON.parse(match.matchDetails) as MatchDetails;
+      try {
+        matchDetails = JSON.parse(match.matchDetails) as MatchDetails;
+      } catch {
+        logger.warn({ matchId: match.id }, "Détails match en cache invalides, re-fetch");
+      }
     } else {
       // Fetch depuis l'API et cache en DB
       try {
