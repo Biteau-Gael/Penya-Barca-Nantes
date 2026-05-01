@@ -18,7 +18,9 @@ export async function action({ request }: { request: Request }) {
   if (intent === "create" && session.user.role === "admin") {
     const matchId = formData.get("matchId") as string;
     const question = formData.get("question") as string;
-    const type = (formData.get("type") as string) || "qcm";
+    const ALLOWED_TYPES = ["qcm", "libre"] as const;
+    const rawType = formData.get("type") as string;
+    const type = ALLOWED_TYPES.includes(rawType as typeof ALLOWED_TYPES[number]) ? rawType : "qcm";
     const optionsRaw = formData.get("options") as string;
     const pointsValue = parseInt(formData.get("pointsValue") as string) || 1;
     const deadlineSeconds = parseInt(formData.get("deadlineSeconds") as string) || 120;
