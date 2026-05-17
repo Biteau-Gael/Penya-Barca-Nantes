@@ -216,6 +216,58 @@ if (!ALLOWED_TYPES.includes(file.type)) {
 
 ---
 
+#### [M-05] Escalade de privilèges admin — pas de hiérarchie de rôles
+
+**Fichier :** `app/routes/admin.members.server.ts`, lignes 55–63
+
+```typescript
+if (intent === "change-role") {
+  const newRole = formData.get("role") as string;
+  if (!["member", "admin", "partner"].includes(newRole)) {
+    return { error: "Rôle invalide." };
+  }
+  await db.update(user).set({ role: newRole, ... }).where(eq(user.id, memberId));
+}
+```
+
+N'importe quel admin peut rétrograder ou promouvoir n'importe quel autre admin. Il n'existe pas de notion de super-admin ou de hiérarchie : un admin malveillant peut rétrograder l'ensemble des autres admins en `member`, prenant ainsi un contrôle exclusif.
+
+**Correction recommandée :** Bloquer la modification du rôle d'un utilisateur ayant déjà le rôle `admin` (sauf par un compte super-admin désigné), ou introduire un rôle `super-admin` non modifiable via l'interface.
+
+---
+
+#### [M-06] Absence de rate limiting sur l'upload d'avatar
+
+**Fichier :** `app/routes/profile.server.ts`, lignes 134–149
+
+L'action `update-avatar` n'a aucun rate limiting. Un utilisateur authentifié peut uploader des centaines de fichiers en boucle, épuisant l'espace disque du serveur. La limitation de taille (2 Mo/fichier) n'empêche pas le volume d'appels.
+
+De plus, l'ancien avatar n'est pas supprimé du disque avant d'en écrire un nouveau : les fichiers obsolètes s'accumulent.
+
+**Correction recommandée :**
+- Appliquer `checkRateLimit` (déjà disponible) : max 5 uploads par heure par utilisateur.
+- Supprimer l'ancien fichier avatar avant l'écriture du nouveau dans `processAvatar`.
+
+---
+
+#### [M-07] `JSON.parse` sans protection sur les options de micro-pronos
+
+**Fichier :** `app/routes/soiree.server.ts`, ligne 250
+
+```typescript
+options: m.options ? JSON.parse(m.options) as string[] : [],
+```
+
+Si la colonne `options` en base contient une valeur JSON corrompue (suite à une migration, un bug, ou une insertion directe), l'appel `JSON.parse` lève une exception non gérée qui remonte en 500 pour tous les utilisateurs de la page soirée.
+
+**Correction recommandée :**
+
+```typescript
+options: m.options ? (() => { try { return JSON.parse(m.options) as string[]; } catch { return []; } })() : [],
+```
+
+---
+
 ### FAIBLE
 
 ---
@@ -306,6 +358,9 @@ Le fichier `.dockerignore` exclut correctement `node_modules` et `build`, mais n
 | M-02 | **MOYEN** | `Dockerfile:17` | Conteneur Docker s'exécutant en tant que `root` |
 | M-03 | **MOYEN** | `api.micro-predictions.ts:99` | Deadline micro-pronos non vérifiée côté serveur |
 | M-04 | **MOYEN** | `upload.ts:13` | Validation MIME basée sur `file.type` client (atténuée par `sharp`) |
+| M-05 | **MOYEN** | `admin.members.server.ts:55` | Escalade de privilèges — un admin peut rétrograder tout autre admin |
+| M-06 | **MOYEN** | `profile.server.ts:134` | Pas de rate limiting sur l'upload d'avatar, accumulation de fichiers |
+| M-07 | **MOYEN** | `soiree.server.ts:250` | `JSON.parse` sans try-catch peut provoquer un 500 si données corrompues |
 | F-01 | **FAIBLE** | `.gitignore:2` | Variantes `.env.*` non ignorées |
 | F-02 | **FAIBLE** | `feed.server.ts:136` | Erreurs `evaluateBadges` silencieuses (pas de log) |
 | F-03 | **FAIBLE** | `api.sync-matches.ts:22` | Messages d'erreur bruts exposés au client admin |
