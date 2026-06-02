@@ -133,7 +133,7 @@ export async function feedAction({ request }: { request: Request }) {
     });
 
     logger.info({ action: "post-created", userId: session.user.id }, "Post publié");
-    evaluateBadges(session.user.id).catch(() => {});
+    evaluateBadges(session.user.id).catch((err) => logger.error({ err, userId: session.user.id }, "Erreur évaluation badges"));
     return { success: true };
   }
 
@@ -153,7 +153,7 @@ export async function feedAction({ request }: { request: Request }) {
         postId,
         userId: session.user.id,
       });
-      evaluateBadges(session.user.id).catch(() => {});
+      evaluateBadges(session.user.id).catch((err) => logger.error({ err, userId: session.user.id }, "Erreur évaluation badges"));
     }
 
     return { success: true };
@@ -175,7 +175,7 @@ export async function feedAction({ request }: { request: Request }) {
       content: result.data.content,
     });
 
-    evaluateBadges(session.user.id).catch(() => {});
+    evaluateBadges(session.user.id).catch((err) => logger.error({ err, userId: session.user.id }, "Erreur évaluation badges"));
     return { success: true };
   }
 

@@ -1,5 +1,5 @@
 import { db } from "~/db/client";
-import { badges, userBadges, matchPredictions, feedPosts, comments, reactions } from "~/db/schema";
+import { badges, userBadges, matchPredictions, feedPosts, comments, reactions, user } from "~/db/schema";
 import { eq, sql, and } from "drizzle-orm";
 import { createId } from "~/lib/utils";
 import { logger } from "./logger.server";
@@ -136,10 +136,10 @@ async function getUserStats(userId: string): Promise<UserStats> {
     }).from(feedPosts).where(eq(feedPosts.authorId, userId)),
   ]);
 
-  // bestStreak from user table
-  const [userRow] = await db.select({ bestStreak: sql<number>`coalesce(best_streak, 0)::int` })
-    .from(sql`"user"`)
-    .where(sql`id = ${userId}`);
+  const [userRow] = await db
+    .select({ bestStreak: sql<number>`coalesce(${user.bestStreak}, 0)::int` })
+    .from(user)
+    .where(eq(user.id, userId));
 
   return {
     predictionsCount: predStats?.predictionsCount ?? 0,

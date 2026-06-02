@@ -2,7 +2,13 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 export async function loader({ params }: { params: { "*": string } }) {
-  const filePath = path.join(process.cwd(), "uploads", params["*"]);
+  const uploadRoot = path.resolve(process.cwd(), "uploads");
+  const filePath = path.resolve(uploadRoot, params["*"]);
+
+  // Empêche le path traversal (ex: /uploads/../../.env)
+  if (!filePath.startsWith(uploadRoot + path.sep) && filePath !== uploadRoot) {
+    return new Response("Not found", { status: 404 });
+  }
 
   try {
     const file = await readFile(filePath);

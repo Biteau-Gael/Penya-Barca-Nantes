@@ -185,6 +185,6 @@ export async function matchDetailAction({
   });
 
   logger.info({ action: "prediction-submitted", userId: session.user.id, matchId: params.matchId }, "Pronostic soumis");
-  evaluateBadges(session.user.id).catch(() => {});
+  evaluateBadges(session.user.id).catch((err) => logger.error({ err, userId: session.user.id }, "Erreur évaluation badges"));
   return { success: true, message: "Pronostic enregistré avec succès !" };
 }
