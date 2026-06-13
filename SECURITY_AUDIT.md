@@ -251,6 +251,70 @@ README.md
 
 ---
 
+#### M-06 — Validation insuffisante des options de micro-pronostics
+
+**Fichier :** `app/routes/api.micro-predictions.ts` (lignes 22, 30)
+
+```typescript
+const optionsRaw = formData.get("options") as string;
+const options = optionsRaw ? JSON.stringify(optionsRaw.split(",").map((o) => o.trim())) : null;
+```
+
+**Problème :** Aucune limite sur le nombre d'options (possibilité de créer des milliers d'entrées), ni sur leur taille individuelle. Peut entraîner un stockage excessif ou un rendu côté client difficile.
+
+**Correction :**
+```typescript
+const optionsSchema = z.array(z.string().max(100)).min(2).max(10);
+const options = optionsSchema.parse(optionsRaw.split(",").map(o => o.trim()));
+```
+
+---
+
+### HAUTE — Dépendances npm vulnérables
+
+#### D-01 — RCE via turbo-stream dans `react-router` (version actuelle : 7.14.0)
+
+**CVE :** `GHSA-49rj-9fvp-4h2h`  
+**Plage vulnérable :** `7.0.0 – 7.14.2`
+
+**Problème :** Le module turbo-stream embarqué dans react-router permet l'invocation de constructeurs arbitraires lors de la désérialisation via le type `TYPE_ERROR`. Exploitable à distance sans authentification (RCE non authentifié).
+
+**Correction :** Mettre à jour react-router à la version `7.14.3` ou supérieure.
+
+---
+
+#### D-02 — Bypass OAuth dans `better-auth` (version actuelle : ^1.6.2)
+
+- **`GHSA-wxw3-q3m9-c3jr`** : Le callback OAuth accepte un `state` non correspondant quand le stockage en cookie est utilisé sans PKCE → vol de session possible.
+- **`GHSA-cq3f-vc6p-68fh`** : L'autorisation de device flow accepte n'importe quelle session authentifiée tant que le `user_code` est en attente → prise de contrôle de compte.
+
+**Correction :** Vérifier et appliquer le dernier patch de better-auth dès qu'il est disponible.
+
+---
+
+#### D-03 — Vulnérabilités dans Vite (version actuelle : ^8.0.3)
+
+**Plage vulnérable :** `4.2.0-beta.0 – 8.0.3`
+
+Plusieurs CVEs affectant le serveur de développement Vite (lecture de fichiers arbitraires, requêtes cross-origin non autorisées). Impact en production limité, mais critique si le port Vite est exposé.
+
+**Correction :** Mettre à jour Vite à `8.0.4+` dès disponibilité.
+
+---
+
+#### D-04 — Autres dépendances HIGH (résumé)
+
+| Package | CVE | Impact |
+|---------|-----|--------|
+| `fast-uri` ≤ 3.1.1 | `GHSA-q3j6-qgpj-74h6` | Path traversal via segments percent-encodés |
+| `lodash` ≤ 4.17.23 | `GHSA-r5fr-rjxr-66jc` | Code injection via `_.template` |
+| `esbuild` ≤ 0.28.0 | `GHSA-67mh-4wv8-2f99` | Dev server lisible depuis n'importe quel site |
+| `kysely` 0.26–0.28.16 | `GHSA-pv5w-4p9q-p3v2` | JSON-path traversal injection |
+
+**Commande :** `npm audit` retourne **30 vulnérabilités** (14 modérées, 16 hautes).
+
+---
+
 ### FAIBLE
 
 #### F-01 — Cache avatar immuable sur un nom de fichier fixe
@@ -296,11 +360,19 @@ docker compose ... pg_dump ... > "$BACKUP_DIR/penya_$DATE.sql" || { echo "ERREUR
 | Criticité | Nb | Sujets |
 |-----------|-----|--------|
 | CRITIQUE | 1 | Path traversal fichiers uploads |
-| HAUTE | 4 | Root Docker, mots de passe défaut, health public, headers sécurité |
-| MOYENNE | 5 | IP spoofing rate limit, typage role, .gitignore, rate limit actions, .dockerignore |
+| HAUTE | 8 | Root Docker, mots de passe défaut, health public, headers sécurité, RCE react-router, OAuth bypass better-auth, Vite vulnérable, lodash/fast-uri/kysely |
+| MOYENNE | 6 | IP spoofing rate limit, typage role, .gitignore, rate limit actions, .dockerignore, options micro-pronos |
 | FAIBLE | 3 | Cache avatar, backup.sh, postId validation |
 
-**Action prioritaire :** Corriger C-01 (path traversal) immédiatement — exploitable sans authentification.
+**Actions prioritaires :**
+1. **C-01** — Corriger `uploads-files.ts` (path traversal sans authentification)
+2. **D-01** — Mettre à jour `react-router` ≥ 7.14.3 (RCE non authentifié)
+3. **D-02** — Patcher `better-auth` (bypass OAuth / prise de contrôle de compte)
+
+```bash
+npm audit  # 30 vulnérabilités actuellement (16 HIGH)
+npm update react-router @react-router/node @react-router/express
+```
 
 ---
 
