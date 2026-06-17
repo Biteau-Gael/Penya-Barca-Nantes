@@ -3,11 +3,15 @@ import { checkRateLimit } from "~/lib/server/rate-limit.server";
 import { logger } from "~/lib/server/logger.server";
 
 function getClientIp(request: Request): string {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-  );
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    // Use the last IP added by the trusted reverse proxy, not the first
+    // (the first can be forged by the client to bypass rate limiting)
+    const ips = forwarded.split(",").map((ip) => ip.trim()).filter(Boolean);
+    const lastIp = ips[ips.length - 1];
+    if (lastIp) return lastIp;
+  }
+  return request.headers.get("x-real-ip") || "unknown";
 }
 
 async function applyRateLimit(request: Request) {
