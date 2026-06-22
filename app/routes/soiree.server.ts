@@ -251,7 +251,7 @@ export async function soireeLoader({
         pointsValue: m.pointsValue,
         deadlineSeconds: m.deadlineSeconds,
         closedAt: m.closedAt?.toISOString() ?? null,
-        correctAnswer: m.correctAnswer,
+        correctAnswer: m.closedAt ? m.correctAnswer : null,
         createdAt: m.createdAt.toISOString(),
         answered: !!userAnswer,
         userAnswer: userAnswer?.answer ?? null,
