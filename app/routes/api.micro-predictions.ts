@@ -36,7 +36,7 @@ export async function action({ request }: { request: Request }) {
       type,
       options,
       pointsValue,
-      deadlineSeconds,
+      deadline: deadlineSeconds,
     }).returning();
 
     logger.info({ microId: created.id, matchId }, "Micro-pronostic créé");
@@ -102,7 +102,12 @@ export async function action({ request }: { request: Request }) {
       .where(eq(microPredictions.id, microId));
 
     if (!micro || micro.closedAt) {
-      return Response.json({ error: "Micro-pronostic ferm��" }, { status: 400 });
+      return Response.json({ error: "Micro-pronostic fermé" }, { status: 400 });
+    }
+
+    const expiresAt = new Date(micro.createdAt.getTime() + micro.deadline * 1000);
+    if (new Date() > expiresAt) {
+      return Response.json({ error: "Délai de réponse dépassé" }, { status: 400 });
     }
 
     // Vérifier que l'utilisateur n'a pas déjà répondu

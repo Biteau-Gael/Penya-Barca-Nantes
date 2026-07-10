@@ -249,7 +249,7 @@ export async function soireeLoader({
         type: m.type,
         options: m.options ? JSON.parse(m.options) as string[] : [],
         pointsValue: m.pointsValue,
-        deadlineSeconds: m.deadlineSeconds,
+        deadlineSeconds: m.deadline,
         closedAt: m.closedAt?.toISOString() ?? null,
         correctAnswer: m.correctAnswer,
         createdAt: m.createdAt.toISOString(),
