@@ -169,7 +169,13 @@ export async function evaluateBadges(userId: string): Promise<string[]> {
   for (const badge of allBadges) {
     if (ownedBadgeIds.has(badge.id)) continue;
 
-    const condition = JSON.parse(badge.condition) as { type: string; threshold: number };
+    let condition: { type: string; threshold: number };
+    try {
+      condition = JSON.parse(badge.condition) as { type: string; threshold: number };
+    } catch {
+      logger.error({ badgeId: badge.id }, "Condition de badge invalide, ignorée");
+      continue;
+    }
     let value = 0;
 
     switch (condition.type) {
