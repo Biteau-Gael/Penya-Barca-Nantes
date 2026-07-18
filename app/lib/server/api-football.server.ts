@@ -442,7 +442,15 @@ export async function fetchMatchDetails(eventId: number): Promise<MatchDetails> 
   }
 
   if (highlightsRes.status === "fulfilled" && highlightsRes.value.status === "success") {
-    highlightUrl = highlightsRes.value.response.highlights?.url ?? null;
+    const rawUrl = highlightsRes.value.response.highlights?.url ?? null;
+    if (rawUrl) {
+      try {
+        const parsed = new URL(rawUrl);
+        highlightUrl = parsed.protocol === "https:" ? rawUrl : null;
+      } catch {
+        highlightUrl = null;
+      }
+    }
   }
 
   logger.info({ eventId, hasHome: !!homeLineup, hasAway: !!awayLineup, statsGroups: stats.length }, "Détails match récupérés");
