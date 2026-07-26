@@ -13,11 +13,14 @@ export async function checkRateLimit({
   windowSeconds,
 }: RateLimitOptions): Promise<void> {
   const redisKey = `rate-limit:${key}`;
-  const current = await redis.incr(redisKey);
 
-  if (current === 1) {
-    await redis.expire(redisKey, windowSeconds);
-  }
+  // Atomic INCR + EXPIRE via pipeline to avoid a race condition where the
+  // TTL is never set if the process crashes between the two commands.
+  const pipeline = redis.pipeline();
+  pipeline.incr(redisKey);
+  pipeline.expire(redisKey, windowSeconds, "NX");
+  const results = await pipeline.exec();
+  const current = (results?.[0]?.[1] as number) ?? 0;
 
   if (current > maxAttempts) {
     throw new AppError(
