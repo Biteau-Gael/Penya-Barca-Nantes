@@ -95,6 +95,10 @@ export async function action({ request }: { request: Request }) {
       return Response.json({ error: "Champs manquants" }, { status: 400 });
     }
 
+    if (answer.length > 200) {
+      return Response.json({ error: "Réponse trop longue (200 caractères max)" }, { status: 400 });
+    }
+
     // Vérifier que le micro n'est pas clôturé
     const [micro] = await db
       .select()
