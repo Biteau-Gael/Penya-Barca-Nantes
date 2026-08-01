@@ -2,7 +2,8 @@
 
 > **Date d'analyse :** 01/08/2026  
 > **Branche analysée :** `main` (HEAD `003faca`)  
-> **Analysé par :** Claude Code (automatique, tâche planifiée)
+> **Analysé par :** Claude Code (automatique, tâche planifiée)  
+> **Statut :** ✅ C-1 corrigé et poussé (`app/routes/uploads-files.ts`)
 
 ---
 
@@ -27,155 +28,258 @@ La Phase 2 a introduit **3 050 lignes** de code réparties sur 29 fichiers :
 - Gestion des **séries** (`streaks.server.ts`) et des **saisons** (`seasons.server.ts`)
 - Nouvelles tables BDD : `badges`, `user_badges`, `micro_predictions`, `micro_prediction_answers`, `rewards`, `seasons`
 
+**Bilan npm audit :** 35 vulnérabilités (1 critique, 16 élevées, 17 modérées, 1 faible) — principalement `better-auth ≤1.6.2` et `@react-router/* 7.14.0`.
+
 ---
 
 ## Analyse de sécurité par ordre de criticité
 
 ### 🔴 CRITIQUE
 
-#### C-1 — Mots de passe Docker par défaut faibles
-**Fichier :** `docker-compose.prod.yml` (lignes 17, 22)
+#### C-1 — Path Traversal dans la route de serveur de fichiers ✅ CORRIGÉ
+**Fichier :** `app/routes/uploads-files.ts`  
+**Statut :** Corrigé dans ce commit
+
+```ts
+// AVANT (vulnérable)
+const filePath = path.join(process.cwd(), "uploads", params["*"]);
+// Un attaquant pouvait requêter /uploads/../../../etc/passwd
+
+// APRÈS (corrigé)
+const filePath = path.resolve(UPLOADS_BASE, requested);
+if (!filePath.startsWith(UPLOADS_BASE + path.sep)) {
+  return new Response("Forbidden", { status: 403 });
+}
+// + validation de l'extension uniquement aux types autorisés
+```
+
+**Risque originel :** Un attaquant non authentifié pouvait lire n'importe quel fichier accessible par le processus Node (`.env`, bundle serveur, `/etc/passwd`...) via une requête GET vers `/uploads/../../../etc/passwd`.
+
+---
+
+#### C-2 — `better-auth ^1.6.2` — 12 CVEs dont compromission de compte
+**Fichier :** `package.json` (ligne 20)  
+**npm audit :** 1 critique, plusieurs élevées
+
+Vulnerabilités pertinentes même sans OAuth/OIDC activé :
+- `GHSA-2vg6-77g8-24mp` — Sessions persistantes après suppression d'utilisateur (CWE-613)
+- `GHSA-g38m-r43w-p2q7` — Prise de compte via auto-link OAuth email non vérifié (CWE-287)
+- `GHSA-wxw3-q3m9-c3jr` — Mismatch `state` OAuth accepté sans PKCE
+- `GHSA-86j7-9j95-vpqj` — XSS stocké via `javascript:` dans redirect_uri OIDC
+
+**Correctif :** Mettre à jour dès qu'une version patchée est disponible. En attendant : vérifier qu'aucun plugin OIDC, magic-link ou OAuth n'est activé dans `auth.server.ts`.
+
+---
+
+### 🟠 ÉLEVÉ
+
+#### H-1 — Aucun en-tête de sécurité HTTP
+**Fichiers :** `app/root.tsx`, `docker/nginx/nginx.conf`
+
+L'application n'envoie aucun des en-têtes suivants : `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Strict-Transport-Security`, `Referrer-Policy`.
+
+**Correctif :** Ajouter un export `headers` dans `root.tsx` ou un `entry.server.tsx` :
+```ts
+export const headers = () => ({
+  "X-Frame-Options": "DENY",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; ...",
+});
+```
+
+#### H-2 — Container Docker exécuté en tant que root
+**Fichier :** `Dockerfile` (toutes les étapes)
+
+Aucune instruction `USER` dans le Dockerfile. En cas d'exploitation, l'attaquant dispose des droits root dans le conteneur.
+
+**Correctif :**
+```dockerfile
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+```
+
+#### H-3 — `.env` absent du `.dockerignore`
+**Fichier :** `.dockerignore`
+
+Le `COPY . /app` des étapes `development-dependencies-env` et `build-env` peut embarquer un fichier `.env` dans les couches intermédiaires de l'image Docker (récupérables avec `docker history`).
+
+**Correctif :** Ajouter à `.dockerignore` :
+```
+.env
+.env.*
+!.env.example
+```
+
+#### H-4 — Spoofing IP via `X-Forwarded-For` pour contourner le rate limiting
+**Fichier :** `app/routes/api.auth.$.ts` (lignes 7–9)
+
+La config nginx utilise `$proxy_add_x_forwarded_for` qui *ajoute* à la valeur client sans l'écraser. Un attaquant peut forger `X-Forwarded-For: 1.2.3.4` et bypasser indéfiniment le rate limiting de login.
+
+**Correctif dans nginx :**
+```nginx
+proxy_set_header X-Forwarded-For $remote_addr;  # écrase, ne pas append
+```
+Ou dans l'app, lire le **dernier** IP de la liste (celui ajouté par le proxy) :
+```ts
+const xff = request.headers.get("x-forwarded-for");
+const ip = xff ? xff.split(",").pop()?.trim() : "unknown";
+```
+
+#### H-5 — Fuite d'informations internes dans `api/sync-matches`
+**Fichier :** `app/routes/api.sync-matches.ts` (lignes 21–22)
+
+```ts
+const message = error instanceof Error ? error.message : "Erreur inconnue";
+return Response.json({ error: message }, { status: 500 });
+```
+
+Des messages d'erreur peuvent contenir des noms d'hôtes internes, des connexions BDD, des clés API dans les URLs.
+
+**Correctif :** Logger l'erreur côté serveur, renvoyer un message générique au client.
+
+#### H-6 — Rate limiting absent sur les routes de mutation de contenu
+**Fichiers :** `app/routes/api.micro-predictions.ts`, `app/routes/feed.server.ts`
+
+Le rate limiting est uniquement appliqué aux routes d'authentification. Les endpoints de création de posts, commentaires, réactions, micro-pronostics n'ont aucune limite de débit.
+
+**Correctif :** Ajouter `checkRateLimit` avec `userId` comme clé sur toutes les actions de mutation.
+
+#### H-7 — `@react-router/* 7.14.0` — Vulnérabilités élevées
+**Fichier :** `package.json`
+
+`npm audit` signale des advisories élevées sur `@react-router/node`, `@react-router/serve`, `@react-router/dev` ≤7.14.1. Un fix est disponible en `7.18.2`.
+
+**Correctif :**
+```bash
+npm update react-router @react-router/node @react-router/serve @react-router/dev
+```
+
+---
+
+### 🟡 MOYEN
+
+#### M-1 — `trustedOrigins` vide si `APP_URL` n'est pas définie
+**Fichier :** `app/lib/server/auth.server.ts` (ligne 12)
+
+`APP_URL` est optionnel dans le schéma Zod et absent de `.env.example`. En production sans cette variable, `trustedOrigins: []` — comportement non déterministe de Better Auth.
+
+**Correctif :** Rendre `APP_URL` obligatoire ou fournir un fallback explicite.
+
+#### M-2 — Pas de vérification d'email à l'inscription
+**Fichier :** `app/lib/server/auth.server.ts`
+
+`emailVerification` n'est pas activé. Un utilisateur peut s'inscrire avec n'importe quelle adresse email et accéder immédiatement à l'application.
+
+**Correctif :** Activer la vérification email dans Better Auth et bloquer l'accès tant que `emailVerified !== true`.
+
+#### M-3 — `pointsScheme` non validé
+**Fichier :** `app/routes/admin.matches.server.ts` (lignes 59, 95)
+
+Le champ `pointsScheme` est accepté sans validation contre les valeurs autorisées (`"standard"`, `"strict"`, `"souple"`).
+
+**Correctif :** `z.enum(["standard", "strict", "souple"])`.
+
+#### M-4 — Champs `type`, `question`, `answer` sans limites dans les micro-pronostics
+**Fichier :** `app/routes/api.micro-predictions.ts`
+
+Aucune validation Zod sur les champs de création et de réponse aux micro-pronostics : pas de longueur max, pas d'enum pour `type`.
+
+**Correctif :**
+```ts
+const createMicroSchema = z.object({
+  question: z.string().min(1).max(500),
+  type: z.enum(["qcm", "score", "player"]),
+  pointsValue: z.coerce.number().int().min(1).max(100),
+  deadlineSeconds: z.coerce.number().int().min(10).max(3600),
+});
+const answerSchema = z.object({
+  answer: z.string().min(1).max(200),
+});
+```
+
+#### M-5 — `highlightUrl` externe rendu directement en `<a href>`
+**Fichier :** `app/routes/match-detail.tsx` (ligne ~314)
+
+L'URL de highlight provient d'une API tierce non contrôlée et est rendue directement en lien. Une URL `javascript:` ou de phishing serait cliquable.
+
+**Correctif :** Valider côté serveur avant stockage :
+```ts
+const isValidHttpUrl = (url: string) => /^https?:\/\//.test(url);
+highlightUrl = isValidHttpUrl(raw) ? raw : null;
+```
+
+#### M-6 — `seasonParam` non validé contre une liste autorisée
+**Fichier :** `app/routes/rankings.server.ts` (lignes 21–26)
+
+Le paramètre de query string `saison` est utilisé directement en DB sans vérification qu'il correspond à une saison existante (SQL injection évitée par Drizzle, mais risque de fuite de données cross-saison).
+
+**Correctif :**
+```ts
+const validLabels = allSeasons.map(s => s.label);
+const seasonLabel = seasonParam && validLabels.includes(seasonParam)
+  ? seasonParam : activeSeason.label;
+```
+
+#### M-7 — Redis bypass la validation `getEnv()`
+**Fichier :** `app/lib/server/redis.server.ts`
+
+La connexion Redis lit `process.env.REDIS_URL` directement sans passer par Zod, avec fallback silencieux vers `redis://localhost:6379`.
+
+**Correctif :** Utiliser `getEnv().REDIS_URL`.
+
+#### M-8 — Mots de passe Docker par défaut `changeme`
+**Fichier :** `docker-compose.prod.yml` (lignes 22, 32–34)
 
 ```yaml
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
 redis-server --requirepass ${REDIS_PASSWORD:-changeme}
 ```
 
-**Risque :** Si le fichier `.env` de production n'est pas correctement configuré, les services PostgreSQL et Redis démarrent avec le mot de passe `changeme`. Un attaquant ayant accès au réseau interne du NAS peut compromettre toute la base de données.
+Si `.env` n'est pas configuré, PostgreSQL et Redis démarrent avec des credentials triviaux.
 
-**Correctif :** Supprimer les valeurs par défaut pour forcer la configuration explicite, ou lever une erreur au démarrage si les variables ne sont pas définies :
-```yaml
-POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Variable POSTGRES_PASSWORD non définie}
-```
+**Correctif :** Supprimer les valeurs de fallback pour forcer l'erreur au démarrage.
 
----
+#### M-9 — `members-list` sans pagination
+**Fichier :** `app/routes/members-list.server.ts`
 
-### 🟠 ÉLEVÉ
+La liste des membres récupère tous les utilisateurs sans `LIMIT`. Peut devenir un vecteur de DoS indirect à mesure que la communauté grandit.
 
-#### H-1 — Container Docker exécuté en tant que root
-**Fichier :** `Dockerfile` (dernière étape, ligne ~14)
-
-Le `Dockerfile` ne définit aucune instruction `USER`. L'application Node.js s'exécute avec les privilèges `root` dans le conteneur. En cas d'exploitation d'une vulnérabilité applicative (ex. path traversal), l'attaquant dispose des droits root dans le conteneur.
-
-**Correctif :** Ajouter avant le `CMD` :
-```dockerfile
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
-```
-
-#### H-2 — `trustedOrigins` vide si `APP_URL` n'est pas définie
-**Fichier :** `app/lib/server/auth.server.ts` (ligne 12)
-
-```ts
-trustedOrigins: env.APP_URL ? [env.APP_URL] : [],
-```
-
-`APP_URL` est marqué comme optionnel dans `env.server.ts`. Si cette variable n'est pas configurée en production, Better Auth reçoit un tableau vide pour `trustedOrigins`. Selon le comportement de la bibliothèque, cela peut soit bloquer toutes les requêtes cross-origin, soit n'appliquer aucune restriction. Dans les deux cas, la configuration est non déterministe en l'absence de documentation explicite sur ce cas.
-
-**Correctif :** Rendre `APP_URL` obligatoire en production ou définir un fallback explicite et documenté :
-```ts
-trustedOrigins: [env.APP_URL ?? "http://localhost:3000"],
-```
-
-#### H-3 — Absence d'en-têtes de sécurité HTTP
-**Fichier :** `app/root.tsx`, aucun middleware global détecté
-
-L'application ne positionne aucun en-tête de sécurité HTTP standard :
-- `Content-Security-Policy` (XSS)
-- `X-Frame-Options` / `frame-ancestors` (clickjacking)
-- `X-Content-Type-Options: nosniff`
-- `Strict-Transport-Security` (HSTS, forcer HTTPS)
-- `Referrer-Policy`
-
-**Correctif :** Ajouter un middleware dans `entry.server.ts` ou dans le loader racine pour injecter ces en-têtes sur toutes les réponses.
-
-#### H-4 — Rate limiting absent sur les routes de création de contenu
-**Fichier :** `app/routes/feed.server.ts`, `app/routes/api.micro-predictions.ts`
-
-Le rate limiting est correctement implémenté sur les routes `/api/auth/sign-in` et `/api/auth/sign-up` (`app/routes/api.auth.$.ts`). Cependant, les routes de création de posts, de commentaires, de réactions, et de réponses aux micro-pronostics n'ont aucune limitation de débit. Un utilisateur authentifié peut spammer massivement ces endpoints.
-
-**Correctif :** Appliquer `checkRateLimit` sur les actions de création dans `feed.server.ts` et `api.micro-predictions.ts`, en utilisant `userId` comme clé.
-
----
-
-### 🟡 MOYEN
-
-#### M-1 — Risque de spoofing de l'IP pour contourner le rate limiting
-**Fichier :** `app/routes/api.auth.$.ts` (lignes 5-11)
-
-```ts
-request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-request.headers.get("x-real-ip") ||
-"unknown"
-```
-
-Si un proxy inverse (Nginx, Traefik) n'est pas configuré pour écraser les en-têtes `X-Forwarded-For`, un attaquant peut forger cet en-tête pour contourner le rate limiting et réessayer indéfiniment avec de fausses IPs.
-
-**Correctif :** Vérifier que le reverse proxy (Synology DSM / Nginx) est configuré pour écraser et non appender l'en-tête. Alternativement, utiliser le `userId` comme clé de rate limiting supplémentaire pour les tentatives de login.
-
-#### M-2 — Validation insuffisante du champ `answer` dans les micro-pronostics
-**Fichier :** `app/routes/api.micro-predictions.ts` (lignes 80-97)
-
-Le champ `answer` soumis par l'utilisateur est inséré en base de données sans validation de longueur ni de format. Un utilisateur peut soumettre une chaîne arbitrairement longue.
-
-**Correctif :**
-```ts
-if (!answer || answer.length > 500) {
-  return Response.json({ error: "Réponse invalide" }, { status: 400 });
-}
-```
-
-#### M-3 — MIME type des uploads basé sur la déclaration client
-**Fichier :** `app/lib/server/upload.ts` (ligne 11)
-
-```ts
-if (!ALLOWED_TYPES.includes(file.type)) { ... }
-```
-
-`file.type` provient du client HTTP et peut être falsifié. Un fichier malveillant pourrait passer la vérification en déclarant `image/jpeg`.
-
-**Atténuation existante :** L'utilisation de `sharp` pour retraiter l'image en WebP protège efficacement contre les payloads camouflés (SVG avec XSS, polyglots). Le risque est limité.
-
-**Amélioration recommandée :** Valider les premiers octets du buffer (magic bytes) plutôt que le Content-Type déclaré, ou confirmer que Sharp lève bien une erreur sur un fichier non-image.
-
-#### M-4 — Port applicatif exposé directement sans reverse proxy dans `docker-compose.prod.yml`
-**Fichier :** `docker-compose.prod.yml` (ligne 5)
-
-```yaml
-ports:
-  - "3000:3000"
-```
-
-Le port 3000 est exposé directement sur l'hôte. Sans reverse proxy (Nginx, Traefik) devant, l'application est accessible en HTTP brut, sans terminaison TLS native.
-
-**Correctif :** Faire passer le trafic via le reverse proxy du NAS Synology (déjà mentionné dans `DEPLOY.md`). Ne pas exposer le port 3000 directement si Nginx gère le TLS.
+**Correctif :** Ajouter `.limit(100)` minimum.
 
 ---
 
 ### 🔵 FAIBLE
 
-#### L-1 — Contournement du typage TypeScript sur `session.user.role`
-**Fichiers :** `app/routes/feed.server.ts` (lignes 96, 107), plusieurs routes
+#### L-1 — `as any` sur le rôle dans `feed.server.ts`
+**Fichier :** `app/routes/feed.server.ts` (lignes 99, 124, 184, 200)
 
-```ts
-(session.user as any).role
+`(session.user as any).role` désactive le typage TypeScript. Typer correctement le champ via l'extension du type Better Auth.
+
+#### L-2 — Nginx sans HTTPS / TLS
+**Fichier :** `docker/nginx/nginx.conf`
+
+Nginx écoute uniquement sur le port 80. Si le NAS Synology ne termine pas TLS en amont, les cookies de session transitent en clair.
+
+**Correctif :** Documenter explicitement que TLS est géré en amont par Synology DSM, ou configurer le certificat dans nginx.
+
+#### L-3 — Pas de `HEALTHCHECK` dans le Dockerfile
+**Fichier :** `Dockerfile`
+
+L'image de production n'a pas d'instruction `HEALTHCHECK`. Docker ne peut pas détecter un processus Node bloqué.
+
+**Correctif :**
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget -qO- http://localhost:3000/api/health || exit 1
 ```
 
-L'utilisation de `as any` désactive la vérification de type. Si le champ `role` est un jour renommé ou retiré, ce contournement ne générera pas d'erreur de compilation.
+#### L-4 — Sauvegardes non chiffrées
+**Fichier :** `backup.sh`
 
-**Correctif :** Étendre le type de session fourni par Better Auth pour inclure les champs additionnels, ou utiliser le type `Session` exporté depuis `auth.server.ts`.
+Les dumps SQL sont stockés non chiffrés dans `/volume1/docker/backups/`. Ils contiennent les hash de mots de passe et toutes les données utilisateurs.
 
-#### L-2 — Requête N+1 dans le loader du fil d'actualité
-**Fichier :** `app/routes/feed.server.ts` (lignes 41-79)
-
-Pour chaque post (jusqu'à 50), 3 requêtes sont exécutées en parallèle (réactions, commentaires, like utilisateur). Cela génère jusqu'à 150 requêtes SQL par chargement de page, ce qui peut devenir un vecteur de DoS indirecte si la liste de posts grandit.
-
-**Correctif :** Regrouper les requêtes avec des agrégats SQL ou une jointure avec `GROUP BY`.
-
-#### L-3 — Pas de validation du `Content-Type` des requêtes API
-**Fichier :** `app/routes/api.micro-predictions.ts`
-
-L'action accepte `formData` sans vérifier que la requête a bien le `Content-Type: application/x-www-form-urlencoded` ou `multipart/form-data`. Des clients non-navigateur peuvent envoyer des formats inattendus.
+**Correctif :** Chiffrer avec GPG, restreindre les permissions du répertoire (`chmod 700`).
 
 ---
 
@@ -184,31 +288,42 @@ L'action accepte `formData` sans vérifier que la requête a bien le `Content-Ty
 | Domaine | État |
 |---------|------|
 | Variables d'environnement validées avec Zod | ✅ |
-| Schémas de validation Zod sur tous les formulaires (user, match, feed) | ✅ |
-| Authentification via Better Auth sur toutes les routes protégées | ✅ |
-| Rate limiting sur les routes de login et d'inscription | ✅ |
-| Credentials exclus du repo (`aed5841 security`) | ✅ |
-| Requêtes SQL via ORM Drizzle (protégé contre l'injection SQL) | ✅ |
-| Logs structurés (Pino) sans fuite d'informations sensibles | ✅ |
-| Retraitement des avatars via Sharp (mitigation upload malveillant) | ✅ |
-| Vérification anti-doublon sur les réponses aux micro-pronos | ✅ |
-| Vérification du rôle admin sur toutes les actions admin | ✅ |
+| Schémas Zod sur formulaires (user, match, feed, prediction) | ✅ |
+| Authentification requise sur toutes les routes protégées | ✅ |
+| Rôle `admin` vérifié sur toutes les actions admin | ✅ |
+| Rate limiting sur les routes d'auth (login/register) | ✅ |
+| Credentials exclus du repo (commit `aed5841`) | ✅ |
+| ORM Drizzle — protection SQL injection | ✅ |
+| Logs structurés Pino sans fuite de secrets | ✅ |
+| Retraitement avatars via Sharp (mitigation upload malveillant) | ✅ |
+| Anti-doublon sur les réponses aux micro-pronostics | ✅ |
+| Path traversal uploads corrigé (ce commit) | ✅ |
 
 ---
 
-## Synthèse des actions recommandées
+## Synthèse des actions — par priorité
 
-| Priorité | ID | Action | Effort |
-|----------|----|--------|--------|
-| 🔴 CRITIQUE | C-1 | Supprimer les mots de passe par défaut Docker | Faible |
-| 🟠 ÉLEVÉ | H-1 | Ajouter un utilisateur non-root dans le Dockerfile | Faible |
-| 🟠 ÉLEVÉ | H-2 | Rendre `APP_URL` obligatoire ou documenter le comportement | Faible |
-| 🟠 ÉLEVÉ | H-3 | Ajouter les en-têtes de sécurité HTTP (middleware) | Moyen |
-| 🟠 ÉLEVÉ | H-4 | Rate limiting sur les routes de création de contenu | Moyen |
-| 🟡 MOYEN | M-1 | Vérifier la configuration du reverse proxy pour l'IP | Faible |
-| 🟡 MOYEN | M-2 | Valider la longueur du champ `answer` | Faible |
-| 🟡 MOYEN | M-3 | Valider les magic bytes des uploads | Faible |
-| 🟡 MOYEN | M-4 | Ne pas exposer le port 3000 directement en prod | Faible |
-| 🔵 FAIBLE | L-1 | Typer correctement `session.user.role` | Faible |
-| 🔵 FAIBLE | L-2 | Optimiser les requêtes N+1 du feed | Moyen |
-| 🔵 FAIBLE | L-3 | Valider le Content-Type des requêtes API | Faible |
+| Priorité | ID | Action | Effort | Statut |
+|----------|----|--------|--------|--------|
+| 🔴 CRITIQUE | C-1 | Path traversal `uploads-files.ts` | Faible | **CORRIGÉ** |
+| 🔴 CRITIQUE | C-2 | Mettre à jour `better-auth` vers version patchée | Moyen | À faire |
+| 🟠 ÉLEVÉ | H-1 | En-têtes HTTP sécurité (CSP, HSTS, X-Frame…) | Moyen | À faire |
+| 🟠 ÉLEVÉ | H-2 | Utilisateur non-root dans le Dockerfile | Faible | À faire |
+| 🟠 ÉLEVÉ | H-3 | Exclure `.env` du `.dockerignore` | Faible | À faire |
+| 🟠 ÉLEVÉ | H-4 | Corriger `X-Forwarded-For` dans nginx | Faible | À faire |
+| 🟠 ÉLEVÉ | H-5 | Erreurs internes génériques dans `sync-matches` | Faible | À faire |
+| 🟠 ÉLEVÉ | H-6 | Rate limiting sur routes de mutation | Moyen | À faire |
+| 🟠 ÉLEVÉ | H-7 | Mettre à jour `@react-router/*` vers `7.18.2` | Faible | À faire |
+| 🟡 MOYEN | M-1 | `APP_URL` obligatoire ou documenté | Faible | À faire |
+| 🟡 MOYEN | M-2 | Activer vérification email à l'inscription | Moyen | À faire |
+| 🟡 MOYEN | M-3 | Valider `pointsScheme` (enum Zod) | Faible | À faire |
+| 🟡 MOYEN | M-4 | Validation Zod sur micro-pronostics | Faible | À faire |
+| 🟡 MOYEN | M-5 | Valider `highlightUrl` avant stockage | Faible | À faire |
+| 🟡 MOYEN | M-6 | Valider `seasonParam` contre liste autorisée | Faible | À faire |
+| 🟡 MOYEN | M-7 | Redis passer par `getEnv()` | Faible | À faire |
+| 🟡 MOYEN | M-8 | Supprimer defaults `changeme` Docker | Faible | À faire |
+| 🟡 MOYEN | M-9 | Pagination sur `members-list` | Faible | À faire |
+| 🔵 FAIBLE | L-1 | Typer `session.user.role` sans `as any` | Faible | À faire |
+| 🔵 FAIBLE | L-2 | Documenter/configurer TLS Nginx | Faible | À faire |
+| 🔵 FAIBLE | L-3 | `HEALTHCHECK` dans Dockerfile | Faible | À faire |
+| 🔵 FAIBLE | L-4 | Chiffrer les sauvegardes BDD | Moyen | À faire |
