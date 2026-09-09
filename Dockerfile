@@ -15,8 +15,11 @@ WORKDIR /app
 RUN npm run build
 
 FROM node:20-alpine
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY ./package.json package-lock.json /app/
 COPY --from=production-dependencies-env /app/node_modules /app/node_modules
 COPY --from=build-env /app/build /app/build
+RUN chown -R appuser:appgroup /app
 WORKDIR /app
+USER appuser
 CMD ["npm", "run", "start"]
