@@ -21,3 +21,10 @@
 
 # OS
 Thumbs.db
+
+# Env variants
+.env.local
+.env.production
+.env.production.local
+.env.development.local
+.env.test.local
