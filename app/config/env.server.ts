@@ -12,7 +12,8 @@ const envSchema = z.object({
     .enum(["error", "warn", "info", "debug"])
     .default("info"),
   API_FOOTBALL_KEY: z.string().optional(),
-  APP_URL: z.string().optional(),
+  // Required in production for CSRF protection (trustedOrigins in Better Auth)
+  APP_URL: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
