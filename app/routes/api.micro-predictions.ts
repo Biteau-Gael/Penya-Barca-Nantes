@@ -91,8 +91,8 @@ export async function action({ request }: { request: Request }) {
     const microId = formData.get("microId") as string;
     const answer = formData.get("answer") as string;
 
-    if (!microId || !answer) {
-      return Response.json({ error: "Champs manquants" }, { status: 400 });
+    if (!microId || !answer || answer.length > 500) {
+      return Response.json({ error: "Champs manquants ou invalides" }, { status: 400 });
     }
 
     // Vérifier que le micro n'est pas clôturé
