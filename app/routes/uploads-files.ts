@@ -1,12 +1,25 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+const UPLOADS_DIR = path.resolve(process.cwd(), "uploads");
+
+const ALLOWED_EXTENSIONS = new Set([".webp", ".jpg", ".jpeg", ".png"]);
+
 export async function loader({ params }: { params: { "*": string } }) {
-  const filePath = path.join(process.cwd(), "uploads", params["*"]);
+  const filePath = path.resolve(UPLOADS_DIR, params["*"]);
+
+  // Prevent path traversal: resolved path must stay inside uploads dir
+  if (!filePath.startsWith(UPLOADS_DIR + path.sep) && filePath !== UPLOADS_DIR) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  if (!ALLOWED_EXTENSIONS.has(ext)) {
+    return new Response("Not found", { status: 404 });
+  }
 
   try {
     const file = await readFile(filePath);
-    const ext = path.extname(filePath).toLowerCase();
 
     const mimeTypes: Record<string, string> = {
       ".webp": "image/webp",
@@ -15,7 +28,7 @@ export async function loader({ params }: { params: { "*": string } }) {
       ".png": "image/png",
     };
 
-    return new Response(file, {
+    return new Response(file as Buffer, {
       headers: {
         "Content-Type": mimeTypes[ext] || "application/octet-stream",
         "Cache-Control": "public, max-age=31536000, immutable",
