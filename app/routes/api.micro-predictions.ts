@@ -1,9 +1,24 @@
+import { z } from "zod";
 import { db } from "~/db/client";
 import { microPredictions, microPredictionAnswers } from "~/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "~/lib/server/auth-utils.server";
 import { createId } from "~/lib/utils";
 import { logger } from "~/lib/server/logger.server";
+
+const createMicroSchema = z.object({
+  matchId: z.string().min(1).max(64),
+  question: z.string().min(1).max(300),
+  type: z.enum(["qcm", "score", "player"]).default("qcm"),
+  options: z.string().max(1000).optional(),
+  pointsValue: z.coerce.number().int().min(1).max(100).default(1),
+  deadlineSeconds: z.coerce.number().int().min(10).max(600).default(120),
+});
+
+const answerMicroSchema = z.object({
+  microId: z.string().min(1).max(64),
+  answer: z.string().min(1).max(200),
+});
 
 export async function action({ request }: { request: Request }) {
   const session = await requireAuth(request);
@@ -16,17 +31,20 @@ export async function action({ request }: { request: Request }) {
 
   // --- Admin : créer un micro-pronostic ---
   if (intent === "create" && session.user.role === "admin") {
-    const matchId = formData.get("matchId") as string;
-    const question = formData.get("question") as string;
-    const type = (formData.get("type") as string) || "qcm";
-    const optionsRaw = formData.get("options") as string;
-    const pointsValue = parseInt(formData.get("pointsValue") as string) || 1;
-    const deadlineSeconds = parseInt(formData.get("deadlineSeconds") as string) || 120;
+    const parsed = createMicroSchema.safeParse({
+      matchId: formData.get("matchId"),
+      question: formData.get("question"),
+      type: formData.get("type") || "qcm",
+      options: formData.get("options") || undefined,
+      pointsValue: formData.get("pointsValue"),
+      deadlineSeconds: formData.get("deadlineSeconds"),
+    });
 
-    if (!matchId || !question) {
-      return Response.json({ error: "Champs manquants" }, { status: 400 });
+    if (!parsed.success) {
+      return Response.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
+    const { matchId, question, type, options: optionsRaw, pointsValue, deadlineSeconds } = parsed.data;
     const options = optionsRaw ? JSON.stringify(optionsRaw.split(",").map((o) => o.trim())) : null;
 
     const [created] = await db.insert(microPredictions).values({
@@ -88,12 +106,16 @@ export async function action({ request }: { request: Request }) {
 
   // --- Joueur : répondre à un micro-pronostic ---
   if (intent === "answer") {
-    const microId = formData.get("microId") as string;
-    const answer = formData.get("answer") as string;
+    const parsed = answerMicroSchema.safeParse({
+      microId: formData.get("microId"),
+      answer: formData.get("answer"),
+    });
 
-    if (!microId || !answer) {
-      return Response.json({ error: "Champs manquants" }, { status: 400 });
+    if (!parsed.success) {
+      return Response.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
+
+    const { microId, answer } = parsed.data;
 
     // Vérifier que le micro n'est pas clôturé
     const [micro] = await db

@@ -96,7 +96,7 @@ export async function feedLoader({ request }: { request: Request }) {
   return {
     posts: postsWithCounts,
     currentUserId: session.user.id,
-    isAdmin: (session.user as any).role === "admin",
+    isAdmin: session.user.role === "admin",
   };
 }
 
@@ -121,7 +121,7 @@ export async function feedAction({ request }: { request: Request }) {
     }
 
     // Seuls les admins peuvent publier des annonces
-    if (isAnnouncement && (session.user as any).role !== "admin") {
+    if (isAnnouncement && session.user.role !== "admin") {
       return { error: "Seuls les admins peuvent publier des annonces." };
     }
 
@@ -181,7 +181,7 @@ export async function feedAction({ request }: { request: Request }) {
 
   if (intent === "delete-post") {
     const postId = formData.get("postId") as string;
-    const isAdmin = (session.user as any).role === "admin";
+    const isAdmin = session.user.role === "admin";
 
     const [post] = await db.select({ authorId: feedPosts.authorId }).from(feedPosts).where(eq(feedPosts.id, postId));
     if (!post) return { error: "Post introuvable." };
@@ -197,7 +197,7 @@ export async function feedAction({ request }: { request: Request }) {
 
   if (intent === "delete-comment") {
     const commentId = formData.get("commentId") as string;
-    const isAdmin = (session.user as any).role === "admin";
+    const isAdmin = session.user.role === "admin";
 
     const [comment] = await db.select({ authorId: comments.authorId }).from(comments).where(eq(comments.id, commentId));
     if (!comment) return { error: "Commentaire introuvable." };
