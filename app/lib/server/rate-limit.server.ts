@@ -13,11 +13,13 @@ export async function checkRateLimit({
   windowSeconds,
 }: RateLimitOptions): Promise<void> {
   const redisKey = `rate-limit:${key}`;
-  const current = await redis.incr(redisKey);
-
-  if (current === 1) {
-    await redis.expire(redisKey, windowSeconds);
-  }
+  // Atomic INCR+EXPIRE via Lua to avoid permanent lock if process crashes between the two calls
+  const current = (await redis.eval(
+    "local c = redis.call('INCR', KEYS[1]); if c == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return c",
+    1,
+    redisKey,
+    windowSeconds,
+  )) as number;
 
   if (current > maxAttempts) {
     throw new AppError(
