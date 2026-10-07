@@ -1,5 +1,6 @@
 import { redirect } from "react-router";
 import { requireAuth } from "~/lib/server/auth-utils.server";
+import { auth } from "~/lib/server/auth.server";
 import { updateProfileSchema } from "~/lib/validation/user";
 import { db } from "~/db/client";
 import { user, matchPredictions, matches, microPredictionAnswers } from "~/db/schema";
@@ -125,6 +126,7 @@ export async function profileAction({ request }: { request: Request }) {
 
   // Suppression de compte
   if (intent === "delete-account") {
+    await auth.api.revokeAllSessions({ headers: request.headers });
     await db.delete(user).where(eq(user.id, session.user.id));
     logger.info({ action: "account-deleted", userId: session.user.id }, "Compte supprimé");
     return { success: true, message: "Compte supprimé.", deleted: true };

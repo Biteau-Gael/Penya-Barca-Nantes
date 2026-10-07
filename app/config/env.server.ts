@@ -6,13 +6,13 @@ const envSchema = z.object({
     .default("development"),
   PORT: z.coerce.number().default(3000),
   DATABASE_URL: z.string(),
-  REDIS_URL: z.string().default("redis://localhost:6379"),
+  REDIS_URL: z.string(),
   AUTH_SECRET: z.string().min(16),
   LOG_LEVEL: z
     .enum(["error", "warn", "info", "debug"])
     .default("info"),
   API_FOOTBALL_KEY: z.string().optional(),
-  APP_URL: z.string().optional(),
+  APP_URL: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
