@@ -9,7 +9,9 @@ const env = getEnv();
 
 export const auth = betterAuth({
   basePath: "/api/auth",
-  trustedOrigins: env.APP_URL ? [env.APP_URL] : [],
+  trustedOrigins: env.APP_URL
+    ? [env.APP_URL, "http://localhost:3000"]
+    : ["http://localhost:3000"],
   database: drizzleAdapter(db, {
     provider: "pg",
   }),

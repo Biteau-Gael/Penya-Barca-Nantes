@@ -56,7 +56,9 @@ export async function adminMatchesAction({ request }: { request: Request }) {
 
     const deadlineStr = formData.get("predictionDeadline") as string;
     const deadline = deadlineStr ? new Date(deadlineStr) : null;
-    const pointsScheme = (formData.get("pointsScheme") as string) || "standard";
+    const ALLOWED_SCHEMES = ["standard", "double", "bonus"] as const;
+    const schemeRaw = formData.get("pointsScheme") as string;
+    const pointsScheme = ALLOWED_SCHEMES.includes(schemeRaw as typeof ALLOWED_SCHEMES[number]) ? schemeRaw : "standard";
 
     if (deadline && deadline >= result.data.matchDate) {
       return { error: "La deadline des pronostics doit être avant le coup d'envoi." };
@@ -92,7 +94,9 @@ export async function adminMatchesAction({ request }: { request: Request }) {
 
     const deadlineStr = formData.get("predictionDeadline") as string;
     const deadline = deadlineStr ? new Date(deadlineStr) : null;
-    const pointsScheme = (formData.get("pointsScheme") as string) || "standard";
+    const ALLOWED_SCHEMES_UPDATE = ["standard", "double", "bonus"] as const;
+    const schemeRawUpdate = formData.get("pointsScheme") as string;
+    const pointsScheme = ALLOWED_SCHEMES_UPDATE.includes(schemeRawUpdate as typeof ALLOWED_SCHEMES_UPDATE[number]) ? schemeRawUpdate : "standard";
 
     if (deadline && deadline >= result.data.matchDate) {
       return { error: "La deadline des pronostics doit être avant le coup d'envoi." };
