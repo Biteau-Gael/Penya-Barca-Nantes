@@ -20,8 +20,10 @@ export async function action({ request }: { request: Request }) {
     const question = formData.get("question") as string;
     const type = (formData.get("type") as string) || "qcm";
     const optionsRaw = formData.get("options") as string;
-    const pointsValue = parseInt(formData.get("pointsValue") as string) || 1;
-    const deadlineSeconds = parseInt(formData.get("deadlineSeconds") as string) || 120;
+    const pointsRaw = parseInt(formData.get("pointsValue") as string);
+    const deadlineRaw = parseInt(formData.get("deadlineSeconds") as string);
+    const pointsValue = Number.isFinite(pointsRaw) && pointsRaw >= 1 && pointsRaw <= 100 ? pointsRaw : 1;
+    const deadlineSeconds = Number.isFinite(deadlineRaw) && deadlineRaw >= 10 && deadlineRaw <= 86400 ? deadlineRaw : 120;
 
     if (!matchId || !question) {
       return Response.json({ error: "Champs manquants" }, { status: 400 });
