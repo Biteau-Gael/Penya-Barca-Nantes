@@ -1,8 +1,15 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+const UPLOADS_ROOT = path.resolve(process.cwd(), "uploads");
+
 export async function loader({ params }: { params: { "*": string } }) {
-  const filePath = path.join(process.cwd(), "uploads", params["*"]);
+  const filePath = path.resolve(UPLOADS_ROOT, params["*"]);
+
+  // Prevent path traversal: reject any path outside the uploads directory
+  if (!filePath.startsWith(UPLOADS_ROOT + path.sep)) {
+    return new Response("Forbidden", { status: 403 });
+  }
 
   try {
     const file = await readFile(filePath);
