@@ -95,14 +95,23 @@ export async function action({ request }: { request: Request }) {
       return Response.json({ error: "Champs manquants" }, { status: 400 });
     }
 
-    // Vérifier que le micro n'est pas clôturé
+    if (answer.length > 500) {
+      return Response.json({ error: "Réponse trop longue" }, { status: 400 });
+    }
+
+    // Vérifier que le micro n'est pas clôturé ni expiré
     const [micro] = await db
       .select()
       .from(microPredictions)
       .where(eq(microPredictions.id, microId));
 
     if (!micro || micro.closedAt) {
-      return Response.json({ error: "Micro-pronostic ferm��" }, { status: 400 });
+      return Response.json({ error: "Micro-pronostic fermé" }, { status: 400 });
+    }
+
+    const deadline = new Date(micro.createdAt.getTime() + micro.deadlineSeconds * 1000);
+    if (new Date() > deadline) {
+      return Response.json({ error: "Délai dépassé" }, { status: 400 });
     }
 
     // Vérifier que l'utilisateur n'a pas déjà répondu
